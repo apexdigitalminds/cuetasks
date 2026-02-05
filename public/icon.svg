@@ -1,0 +1,46 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for the glow effect -->
+    <radialGradient id="glowGradient" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.8"/>
+      <stop offset="50%" style="stop-color:#3b82f6;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:0.2"/>
+    </radialGradient>
+    
+    <!-- Filter for outer glow -->
+    <filter id="outerGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Filter for inner glow -->
+    <filter id="innerGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Dark background -->
+  <rect width="512" height="512" fill="#1e293b" rx="80"/>
+  
+  <!-- Outer glow background -->
+  <rect x="64" y="64" width="384" height="384" fill="url(#glowGradient)" rx="48" filter="url(#outerGlow)"/>
+  
+  <!-- Main checkbox outline -->
+  <rect x="96" y="96" width="320" height="320" fill="none" stroke="#3b82f6" stroke-width="8" rx="32" filter="url(#innerGlow)"/>
+  
+  <!-- Inner checkbox area -->
+  <rect x="128" y="128" width="256" height="256" fill="none" stroke="#60a5fa" stroke-width="6" rx="24"/>
+  
+  <!-- Checkmark -->
+  <path d="M180 280 L230 330 L340 200" fill="none" stroke="#3b82f6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" filter="url(#innerGlow)"/>
+  
+  <!-- Additional glow for checkmark -->
+  <path d="M180 280 L230 330 L340 200" fill="none" stroke="#60a5fa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+</svg>
