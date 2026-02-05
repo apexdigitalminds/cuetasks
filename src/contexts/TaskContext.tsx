@@ -32,6 +32,35 @@ interface TaskProviderProps {
 export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
 
+  const sortTasks = (tasksToSort: Task[]): Task[] => {
+    return [...tasksToSort].sort((a, b) => {
+      if (a.starred && !b.starred) return -1;
+      if (!a.starred && b.starred) return 1;
+      if (!a.completed && b.completed) return -1;
+      if (a.completed && !b.completed) return 1;
+      return a.order - b.order;
+    });
+  };
+
+  useEffect(() => {
+    const handleCompleteFromNotification = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const taskId = customEvent.detail?.taskId;
+      if (taskId) {
+        setTasks(prevTasks =>
+          sortTasks(
+            prevTasks.map(task =>
+              task.id === taskId ? { ...task, completed: true } : task
+            )
+          )
+        );
+      }
+    };
+
+    window.addEventListener('completeTaskFromNotification', handleCompleteFromNotification);
+    return () => window.removeEventListener('completeTaskFromNotification', handleCompleteFromNotification);
+  }, []);
+
   useEffect(() => {
     try {
       const savedTasks = localStorage.getItem('tasks');
@@ -55,16 +84,6 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     }
   }, [tasks]);
 
-  const sortTasks = (tasksToSort: Task[]): Task[] => {
-    return [...tasksToSort].sort((a, b) => {
-      if (a.starred && !b.starred) return -1;
-      if (!a.starred && b.starred) return 1;
-      if (!a.completed && b.completed) return -1;
-      if (a.completed && !b.completed) return 1;
-      return a.order - b.order;
-    });
-  };
-
   const addTask = (title: string, dateTime: string, reminder?: TaskReminder) => {
     const newTask: Task = {
       id: Date.now().toString(),
@@ -85,16 +104,32 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   };
 
   const toggleTaskStatus = (id: string) => {
-    setTasks(prevTasks =>
-      sortTasks(
-        prevTasks.map(task =>
-          task.id === id ? { ...task, completed: !task.completed } : task
-        )
-      )
-    );
+    setTasks(prevTasks => {
+      const updatedTasks = prevTasks.map(task => {
+        if (task.id === id) {
+          const updatedTask = { ...task, completed: !task.completed };
+          if (updatedTask.completed && updatedTask.reminder?.enabled && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'CANCEL_REMINDER',
+              data: { taskId: id }
+            });
+          }
+          return updatedTask;
+        }
+        return task;
+      });
+      return sortTasks(updatedTasks);
+    });
   };
 
   const deleteTask = (id: string) => {
+    const taskToDelete = tasks.find(task => task.id === id);
+    if (taskToDelete?.reminder?.enabled && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'CANCEL_REMINDER',
+        data: { taskId: id }
+      });
+    }
     setTasks(prevTasks => prevTasks.filter(task => task.id !== id));
   };
 
@@ -187,14 +222,22 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       const taskDate = new Date(task.dateTime);
       const now = new Date();
       if (taskDate <= now) return;
+      if (!task.reminder?.enabled) return;
+
+      const minutesBefore = task.reminder.minutesBefore || 15;
+      const reminderTime = taskDate.getTime() - (minutesBefore * 60 * 1000);
+
+      if (reminderTime <= now.getTime()) return;
+
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({
-          type: 'SCHEDULE_NOTIFICATION',
+          type: 'SCHEDULE_REMINDER',
           data: {
             taskId: task.id,
-            title: task.title,
-            dateTime: task.dateTime,
-            reminder: task.reminder
+            taskTitle: task.title,
+            reminderTime: reminderTime,
+            dueTime: taskDate.getTime(),
+            minutesBefore: minutesBefore
           }
         });
       }

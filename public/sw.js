@@ -14,11 +14,13 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   console.log('Service worker activating...');
   event.waitUntil(
-    Promise.all([
-      self.clients.claim(),
-      initializeDatabase(),
-      setupPeriodicChecks()
-    ])
+    (async () => {
+      await Promise.all([
+        self.clients.claim(),
+        initializeDatabase()
+      ]);
+      await setupPeriodicChecks();
+    })()
   );
 });
 
