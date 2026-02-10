@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import TaskItem from './TaskItem';
 import { Task } from '../types';
-import { CheckCheck, ListTodo, Filter } from 'lucide-react';
+import { CheckCheck, ListTodo, Filter, Tag } from 'lucide-react';
+import { useTaskContext } from '../contexts/TaskContext';
 
 interface TaskListProps {
   tasks: Task[];
@@ -12,101 +13,135 @@ type FilterType = 'all' | 'active' | 'completed' | 'priority';
 
 const TaskList: React.FC<TaskListProps> = ({ tasks, date }) => {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const { categories, getCategoryById } = useTaskContext();
 
   const filteredTasks = tasks.filter((task) => {
-    if (filter === 'all') return true;
-    if (filter === 'completed') return task.completed;
-    if (filter === 'priority') return task.starred && !task.completed;
-    return !task.completed; // active
+    // Status filter
+    const statusMatch =
+      filter === 'all' ? true :
+        filter === 'completed' ? task.completed :
+          filter === 'priority' ? task.starred && !task.completed :
+            !task.completed;
+
+    // Category filter
+    const categoryMatch = !categoryFilter || task.categoryId === categoryFilter;
+
+    return statusMatch && categoryMatch;
   });
 
   const activeCount = tasks.filter(task => !task.completed).length;
   const completedCount = tasks.filter(task => task.completed).length;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-          Tasks for the Day
-        </h2>
-        
-        <div className="relative inline-block">
-            <div className="group relative">
-              <button
-            className="flex items-center text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-                      dark:hover:bg-gray-600 px-3 py-1.5 rounded-md transition-colors duration-200"
-            aria-label="Filter tasks"
-              >
-            <Filter size={16} className="mr-1.5 text-gray-500 dark:text-gray-400" />
-            <span className="text-gray-700 dark:text-gray-300">
-              {filter === 'all' ? 'All' : 
-               filter === 'active' ? 'To Do' : 
-               filter === 'completed' ? 'Completed' : 'Priority'}
-            </span>
-              </button>
-          
-              <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 
-                        dark:border-gray-700 rounded-md shadow-lg w-36 py-1 z-10 hidden 
-                        group-hover:block">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+      {/* Header */}
+      <div className="p-5 border-b border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Tasks
+          </h2>
+
+          {/* Status Filter Dropdown */}
+          <div className="relative group">
+            <button className="flex items-center gap-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
+                              dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors">
+              <Filter size={14} className="text-gray-500 dark:text-gray-400" />
+              <span className="text-gray-700 dark:text-gray-300">
+                {filter === 'all' ? 'All' :
+                  filter === 'active' ? 'To Do' :
+                    filter === 'completed' ? 'Done' : 'Priority'}
+              </span>
+            </button>
+
+            <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 
+                          dark:border-gray-700 rounded-xl shadow-xl w-36 py-1 z-10 hidden group-hover:block">
+              {['all', 'active', 'completed', 'priority'].map((f) => (
                 <button
-              onClick={() => setFilter('all')}
-              className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
+                  key={f}
+                  onClick={() => setFilter(f as FilterType)}
+                  className={`block w-full text-left px-4 py-2 text-sm transition-colors
+                            ${filter === f
+                      ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                 >
-              All
+                  {f === 'all' ? 'All' : f === 'active' ? 'To Do' : f === 'completed' ? 'Done' : 'Priority'}
                 </button>
-                <button
-              onClick={() => setFilter('active')}
-              className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-              To Do
-                </button>
-                <button
-              onClick={() => setFilter('completed')}
-              className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-              Completed
-                </button>
-                <button
-              onClick={() => setFilter('priority')}
-              className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 
-                        hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-              Priority
-                </button>
-              </div>
+              ))}
             </div>
           </div>
-      </div>
-      
-      <div className="flex items-center space-x-4 mb-5">
-        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-          <ListTodo size={16} className="mr-1.5 text-indigo-500 dark:text-indigo-400" />
-          <span>{activeCount} to do</span>
         </div>
-        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-          <CheckCheck size={16} className="mr-1.5 text-green-500 dark:text-green-400" />
-          <span>{completedCount} completed</span>
+
+        {/* Quick Stats */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+            <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mr-2">
+              <ListTodo size={14} className="text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <span>{activeCount} to do</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+            <div className="w-6 h-6 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center mr-2">
+              <CheckCheck size={14} className="text-green-600 dark:text-green-400" />
+            </div>
+            <span>{completedCount} done</span>
+          </div>
         </div>
-      </div>
-      
-      {filteredTasks.length > 0 ? (
-        <div>
-          {filteredTasks.map((task) => (
-            <TaskItem key={task.id} task={task} />
+
+        {/* Category Filter Pills */}
+        <div className="flex flex-wrap gap-2 mt-4">
+          <button
+            onClick={() => setCategoryFilter('')}
+            className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${!categoryFilter
+                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+          >
+            All
+          </button>
+          {categories.map(category => (
+            <button
+              key={category.id}
+              onClick={() => setCategoryFilter(categoryFilter === category.id ? '' : category.id)}
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${categoryFilter === category.id
+                  ? 'ring-1 ring-offset-1'
+                  : 'opacity-60 hover:opacity-100'
+                }`}
+              style={{
+                backgroundColor: categoryFilter === category.id ? category.color : `${category.color}20`,
+                color: categoryFilter === category.id ? 'white' : category.color
+              }}
+            >
+              {category.icon} {category.name}
+            </button>
           ))}
         </div>
-      ) : (
-        <div className="text-center py-8">
-          <p className="text-gray-500 dark:text-gray-400">
-            {tasks.length === 0
-              ? 'No tasks for this day yet. Add one to get started!'
-              : `No ${filter === 'active' ? 'active' : 'completed'} tasks to show.`}
-          </p>
-        </div>
-      )}
+      </div>
+
+      {/* Task List */}
+      <div className="p-4">
+        {filteredTasks.length > 0 ? (
+          <div className="space-y-0">
+            {filteredTasks.map((task) => (
+              <TaskItem key={task.id} task={task} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+              <ListTodo size={28} className="text-gray-400" />
+            </div>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              {tasks.length === 0
+                ? 'No tasks for this day yet'
+                : `No ${filter === 'active' ? 'active' : filter === 'completed' ? 'completed' : categoryFilter ? 'matching' : ''} tasks`}
+            </p>
+            <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+              {tasks.length === 0 ? 'Add one to get started!' : 'Try a different filter'}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

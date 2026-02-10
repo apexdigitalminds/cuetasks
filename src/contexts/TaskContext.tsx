@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Task, TaskReminder } from '../types';
+import { Task, TaskReminder, Category, DEFAULT_CATEGORIES, RecurrencePattern } from '../types';
 import { isSameDay } from '../utils/dateUtils';
+import { getNextOccurrenceDate, isRecurrenceEnded } from '../utils/recurrence';
 
 interface TaskContextType {
   tasks: Task[];
-  addTask: (title: string, dateTime: string, reminder?: TaskReminder) => void;
+  categories: Category[];
+  addTask: (title: string, dateTime: string, reminder?: TaskReminder, categoryId?: string, recurrence?: RecurrencePattern) => void;
   toggleTaskStatus: (id: string) => void;
   deleteTask: (id: string) => void;
   getTasksForDate: (date: string) => Task[];
@@ -12,7 +14,10 @@ interface TaskContextType {
   moveTaskUp: (id: string) => void;
   moveTaskDown: (id: string) => void;
   editTaskTitle: (id: string, newTitle: string) => void;
-  editTask: (id: string, updates: Partial<Pick<Task, 'title' | 'dateTime' | 'reminder'>>) => void;
+  editTask: (id: string, updates: Partial<Pick<Task, 'title' | 'dateTime' | 'reminder' | 'categoryId'>>) => void;
+  addCategory: (name: string, color: string, icon: string) => void;
+  deleteCategory: (id: string) => void;
+  getCategoryById: (id: string) => Category | undefined;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -31,6 +36,7 @@ interface TaskProviderProps {
 
 export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
 
   const sortTasks = (tasksToSort: Task[]): Task[] => {
     return [...tasksToSort].sort((a, b) => {
@@ -42,6 +48,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     });
   };
 
+  // Handle notification-triggered task completion
   useEffect(() => {
     const handleCompleteFromNotification = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -61,6 +68,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     return () => window.removeEventListener('completeTaskFromNotification', handleCompleteFromNotification);
   }, []);
 
+  // Load tasks from localStorage
   useEffect(() => {
     try {
       const savedTasks = localStorage.getItem('tasks');
@@ -76,6 +84,22 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // Load categories from localStorage
+  useEffect(() => {
+    try {
+      const savedCategories = localStorage.getItem('categories');
+      if (savedCategories) {
+        const parsedCategories = JSON.parse(savedCategories);
+        if (Array.isArray(parsedCategories) && parsedCategories.length > 0) {
+          setCategories(parsedCategories);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load categories from localStorage:', error);
+    }
+  }, []);
+
+  // Save tasks to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('tasks', JSON.stringify(tasks));
@@ -84,7 +108,17 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     }
   }, [tasks]);
 
-  const addTask = (title: string, dateTime: string, reminder?: TaskReminder) => {
+  // Save categories to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('categories', JSON.stringify(categories));
+    } catch (error) {
+      console.warn('Failed to save categories to localStorage:', error);
+    }
+  }, [categories]);
+
+  const addTask = (title: string, dateTime: string, reminder?: TaskReminder, categoryId?: string, recurrence?: RecurrencePattern) => {
+    const seriesId = recurrence ? Date.now().toString() : undefined;
     const newTask: Task = {
       id: Date.now().toString(),
       title,
@@ -93,7 +127,10 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       createdAt: new Date().toISOString(),
       starred: false,
       order: tasks.length,
-      reminder
+      reminder,
+      categoryId,
+      recurrence,
+      seriesId
     };
 
     setTasks(prevTasks => sortTasks([...prevTasks, newTask]));
@@ -105,9 +142,18 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
 
   const toggleTaskStatus = (id: string) => {
     setTasks(prevTasks => {
+      const taskToToggle = prevTasks.find(t => t.id === id);
+      if (!taskToToggle) return prevTasks;
+
       const updatedTasks = prevTasks.map(task => {
         if (task.id === id) {
-          const updatedTask = { ...task, completed: !task.completed };
+          const updatedTask = {
+            ...task,
+            completed: !task.completed,
+            completedAt: !task.completed ? new Date().toISOString() : undefined
+          };
+
+          // Cancel reminder if completing
           if (updatedTask.completed && updatedTask.reminder?.enabled && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({
               type: 'CANCEL_REMINDER',
@@ -118,6 +164,39 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
         }
         return task;
       });
+
+      // If completing a recurring task, create next occurrence
+      if (!taskToToggle.completed && taskToToggle.recurrence && !isRecurrenceEnded(taskToToggle.recurrence)) {
+        const currentDate = new Date(taskToToggle.dateTime || new Date());
+        const nextDate = getNextOccurrenceDate(currentDate, taskToToggle.recurrence);
+
+        if (nextDate) {
+          const newOccurrence: Task = {
+            id: Date.now().toString(),
+            title: taskToToggle.title,
+            dateTime: nextDate.toISOString().slice(0, 16), // Format as datetime-local
+            completed: false,
+            createdAt: new Date().toISOString(),
+            starred: taskToToggle.starred,
+            order: prevTasks.length,
+            reminder: taskToToggle.reminder,
+            categoryId: taskToToggle.categoryId,
+            recurrence: {
+              ...taskToToggle.recurrence,
+              occurrenceCount: (taskToToggle.recurrence.occurrenceCount || 0) + 1
+            },
+            seriesId: taskToToggle.seriesId || taskToToggle.id // Link to series
+          };
+
+          updatedTasks.push(newOccurrence);
+
+          // Schedule notification for new occurrence if needed
+          if (newOccurrence.reminder?.enabled) {
+            scheduleNotification(newOccurrence);
+          }
+        }
+      }
+
       return sortTasks(updatedTasks);
     });
   };
@@ -194,7 +273,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     );
   };
 
-  const editTask = (id: string, updates: Partial<Pick<Task, 'title' | 'dateTime' | 'reminder'>>) => {
+  const editTask = (id: string, updates: Partial<Pick<Task, 'title' | 'dateTime' | 'reminder' | 'categoryId'>>) => {
     setTasks(prevTasks => {
       const updatedTasks = prevTasks.map(task => {
         if (task.id === id) {
@@ -210,11 +289,39 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     });
   };
 
+  // Category management
+  const addCategory = (name: string, color: string, icon: string) => {
+    const newCategory: Category = {
+      id: Date.now().toString(),
+      name,
+      color,
+      icon
+    };
+    setCategories(prev => [...prev, newCategory]);
+  };
+
+  const deleteCategory = (id: string) => {
+    // Don't delete default categories
+    if (DEFAULT_CATEGORIES.some(c => c.id === id)) return;
+
+    setCategories(prev => prev.filter(c => c.id !== id));
+    // Remove category from tasks that have it
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.categoryId === id ? { ...task, categoryId: undefined } : task
+      )
+    );
+  };
+
+  const getCategoryById = (id: string): Category | undefined => {
+    return categories.find(c => c.id === id);
+  };
+
   const scheduleNotification = (task: Task) => {
     if (!task.dateTime || task.dateTime === '') return;
     if (typeof window !== 'undefined' &&
-        (window.location.hostname.includes('webcontainer') ||
-         window.location.hostname.includes('stackblitz'))) {
+      (window.location.hostname.includes('webcontainer') ||
+        window.location.hostname.includes('stackblitz'))) {
       console.warn('Notifications not supported in WebContainer environment');
       return;
     }
@@ -248,6 +355,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
 
   const value: TaskContextType = {
     tasks,
+    categories,
     addTask,
     toggleTaskStatus,
     deleteTask,
@@ -257,6 +365,9 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     moveTaskDown,
     editTaskTitle,
     editTask,
+    addCategory,
+    deleteCategory,
+    getCategoryById,
   };
 
   return (
