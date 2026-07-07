@@ -27,13 +27,21 @@ npm run lint     # eslint
 
 There is no test suite configured.
 
+## Deployment
+
+- **Repo:** `github.com/apexdigitalminds/cuetasks` (owner: apexdigitalminds). Push to `main` to ship.
+- **Host:** Vercel — auto-deploys `main`. Vite framework preset: build `npm run build`, output `dist`, no env vars (no backend). Production domain: `cuetasks.com`.
+- **`vercel.json`** sets `Cache-Control: max-age=0, must-revalidate` + `Service-Worker-Allowed: /` on `/sw.js` so the service worker updates on each deploy rather than being cached. Keep these if editing `vercel.json`.
+- `npm run build` runs `vite build` only (no `tsc`), so type/lint errors do **not** block deploys — run `npm run lint` and `tsc --noEmit -p tsconfig.app.json` locally before pushing.
+- Never embed a credential/token in the git remote URL (origin was previously misconfigured this way).
+
 ## Architecture
 
 - `src/App.tsx` — main layout, header, notification permission wiring, and component orchestration
 - `src/main.tsx` — React entry point + service worker registration
 - `src/contexts/TaskContext.tsx` — global state for tasks and categories (single source of truth; persists to `localStorage`)
 - `src/types/index.ts` — core interfaces: `Task`, `Category`, `RecurrencePattern`
-- `src/components/` — UI: `TaskForm`, `TaskList`, `TaskItem`, `TaskHistory`, `CategoryManager`, `DailySummary`, `ThemeToggle`, `ToastNotification`
+- `src/components/` — UI: `TaskForm`, `TaskList`, `TaskItem`, `TaskHistory`, `CategoryManager`, `DailySummary`, `ThemeToggle`, `ToastNotification`, `Logo` (brand mark)
 - `src/utils/` — `speechRecognition.ts` (Web Speech wrapper), `recurrence.ts` (next-occurrence logic), `reminderChecker.ts` (in-app due-reminder polling), `audio.ts` (alert sounds), `dateUtils.ts`
 - `public/sw.js` — service worker: cache + background push/reminder checks
 
