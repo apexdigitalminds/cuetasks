@@ -19,17 +19,35 @@ interface SpeechRecognitionAlternative {
   confidence: number;
 }
 
+// Web Speech API is non-standard and not in the DOM lib typings.
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+  }
+}
+
 type SpeechRecognitionCallback = (text: string) => void;
 
 class SpeechRecognitionService {
-  private recognition: any = null;
+  private recognition: SpeechRecognitionInstance | null = null;
   private isListening: boolean = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || 
-                               (window as any).webkitSpeechRecognition;
-      
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
       if (SpeechRecognition) {
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = false;
@@ -44,7 +62,7 @@ class SpeechRecognitionService {
   }
 
   public toggleListening(callback: SpeechRecognitionCallback): boolean {
-    if (!this.isSupported()) return false;
+    if (!this.recognition) return false;
 
     if (this.isListening) {
       this.stop();
@@ -56,7 +74,7 @@ class SpeechRecognitionService {
   }
 
   private start(callback: SpeechRecognitionCallback): void {
-    if (!this.isSupported()) return;
+    if (!this.recognition) return;
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = event.results[event.resultIndex][0].transcript;
@@ -67,7 +85,7 @@ class SpeechRecognitionService {
       this.isListening = false;
     };
 
-    this.recognition.onerror = (event: any) => {
+    this.recognition.onerror = (event: { error: string }) => {
       console.error('Speech recognition error', event.error);
       this.isListening = false;
     };
@@ -77,7 +95,7 @@ class SpeechRecognitionService {
   }
 
   private stop(): void {
-    if (this.isSupported() && this.isListening) {
+    if (this.recognition && this.isListening) {
       this.recognition.stop();
       this.isListening = false;
     }
@@ -95,12 +113,11 @@ export const parseSpeechToTask = (speech: string): { title: string; dateTime: st
   let title = speech.trim();
   
   if (match) {
-    const now = new Date();
     const datePart = match[1].toLowerCase();
     const timePart = match[4].toLowerCase();
     
     // Parse date
-    let date = new Date();
+    const date = new Date();
     if (datePart === 'today') {
       // already set to today
     } else if (datePart === 'tomorrow') {

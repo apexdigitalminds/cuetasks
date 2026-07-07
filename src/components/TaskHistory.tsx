@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Search, Calendar, Filter, TrendingUp, CheckCircle2, BarChart3, Clock } from 'lucide-react';
+import { X, Search, Calendar, TrendingUp, CheckCircle2, BarChart3, Clock } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
 import { Task } from '../types';
 

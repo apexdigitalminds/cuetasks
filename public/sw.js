@@ -1,6 +1,6 @@
 // Enhanced service worker for persistent mobile notifications
-const CACHE_NAME = 'taskvoice-v3';
-const DB_NAME = 'TaskVoiceDB';
+const CACHE_NAME = 'cuetasks-v1';
+const DB_NAME = 'CueTasksDB';
 const DB_VERSION = 3;
 
 let db = null;
@@ -100,7 +100,7 @@ self.addEventListener('message', async (event) => {
 // Request notification permission
 async function requestNotificationPermission() {
   try {
-    const permission = await self.registration.showNotification('TaskVoice', {
+    const permission = await self.registration.showNotification('CueTasks', {
       body: 'Notifications are now enabled!',
       icon: '/icon.svg',
       badge: '/icon.svg',
@@ -117,7 +117,7 @@ async function requestNotificationPermission() {
 // Show test notification
 async function showTestNotification() {
   try {
-    await self.registration.showNotification('TaskVoice Test', {
+    await self.registration.showNotification('CueTasks Test', {
       body: 'This is a test notification to verify the system is working.',
       icon: '/icon.svg',
       badge: '/icon.svg',

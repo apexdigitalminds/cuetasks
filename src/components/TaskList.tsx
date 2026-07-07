@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
 import TaskItem from './TaskItem';
 import { Task } from '../types';
-import { CheckCheck, ListTodo, Filter, Tag } from 'lucide-react';
+import { CheckCheck, ListTodo, Filter } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
 
 interface TaskListProps {
   tasks: Task[];
-  date: string;
 }
 
 type FilterType = 'all' | 'active' | 'completed' | 'priority';
 
-const TaskList: React.FC<TaskListProps> = ({ tasks, date }) => {
+const TaskList: React.FC<TaskListProps> = ({ tasks }) => {
   const [filter, setFilter] = useState<FilterType>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const { categories, getCategoryById } = useTaskContext();
+  const { categories } = useTaskContext();
 
   const filteredTasks = tasks.filter((task) => {
     // Status filter

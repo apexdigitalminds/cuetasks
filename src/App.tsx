@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckSquare, Sun, Moon, Bell, BellOff, BellRing, Settings, BarChart3 } from 'lucide-react';
+import { Sun, Moon, Bell, BellOff, BellRing, Settings, BarChart3 } from 'lucide-react';
 import { TaskProvider, useTaskContext } from './contexts/TaskContext';
+import Logo from './components/Logo';
 import TaskForm from './components/TaskForm';
 import TaskList from './components/TaskList';
 import DailySummary from './components/DailySummary';
@@ -31,9 +32,9 @@ const NotificationButton: React.FC = () => {
     if (permission === 'granted') {
       // Test notification
       playNotificationSound();
-      new Notification('TaskVoice', {
+      new Notification('CueTasks', {
         body: 'Notifications are working! 🎉',
-        icon: '/icons/icon-192.png'
+        icon: '/icon.svg'
       });
       return;
     }
@@ -51,9 +52,9 @@ const NotificationButton: React.FC = () => {
 
       if (result === 'granted') {
         playNotificationSound();
-        new Notification('TaskVoice', {
+        new Notification('CueTasks', {
           body: 'Notifications enabled successfully! 🎉',
-          icon: '/icons/icon-192.png'
+          icon: '/icon.svg'
         });
       }
     } catch (error) {
@@ -217,10 +218,8 @@ const AppContent: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl gradient-primary flex items-center justify-center">
-            <CheckSquare size={24} className="text-white" />
-          </div>
-          <p className="text-gray-600 dark:text-gray-400 animate-pulse">Loading TaskVoice...</p>
+          <Logo size={56} idSuffix="loading" className="mx-auto mb-4 drop-shadow-lg" />
+          <p className="text-gray-600 dark:text-gray-400 animate-pulse">Loading CueTasks...</p>
         </div>
       </div>
     );
@@ -249,12 +248,10 @@ const AppContent: React.FC = () => {
                         py-4 px-4 sm:px-6 fixed top-0 w-full z-40">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-indigo-500/25">
-              <CheckSquare size={22} className="text-white" />
-            </div>
+            <Logo size={40} idSuffix="header" className="shrink-0 drop-shadow-sm" />
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">TaskVoice</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Voice-powered task manager</p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">CueTasks</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Say it. Cue it. Get it done.</p>
             </div>
           </div>
 
@@ -299,7 +296,7 @@ const AppContent: React.FC = () => {
 
           {/* Task List - Main content */}
           <div className="lg:col-span-8 order-1 lg:order-2">
-            <TaskList tasks={tasks} date={selectedDate} />
+            <TaskList tasks={tasks} />
           </div>
         </div>
       </main>
@@ -309,10 +306,10 @@ const AppContent: React.FC = () => {
                         py-4 px-4 sm:px-6 fixed bottom-0 w-full">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            TaskVoice
+            CueTasks
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            © 2025
+            © 2026
           </p>
         </div>
       </footer>

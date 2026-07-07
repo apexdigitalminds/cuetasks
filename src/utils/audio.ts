@@ -1,10 +1,18 @@
 // Audio notification utilities
+
+// webkitAudioContext is the non-standard Safari prefix, absent from DOM typings.
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
 let audioContext: AudioContext | null = null;
 
 // Initialize AudioContext on user interaction
 export const initAudio = (): void => {
     if (!audioContext) {
-        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContext = new (window.AudioContext || window.webkitAudioContext!)();
     }
 };
 
@@ -13,7 +21,7 @@ export const playNotificationSound = async (): Promise<void> => {
     try {
         // Initialize on first call
         if (!audioContext) {
-            audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            audioContext = new (window.AudioContext || window.webkitAudioContext!)();
         }
 
         // Resume if suspended (browser autoplay policy)

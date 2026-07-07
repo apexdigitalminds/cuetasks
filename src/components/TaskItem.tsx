@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Check, Clock, Bell, Edit3, Save, X, ArrowUp, ArrowDown, Star, Calendar, Tag, Repeat } from 'lucide-react';
+import { Trash2, Check, Clock, Bell, Edit3, Save, X, ArrowUp, ArrowDown, Star, Calendar, Repeat } from 'lucide-react';
 import { Task } from '../types';
 import { formatTimeOnlyWithTimezone, getLocalDateTimeString } from '../utils/dateUtils';
 import { useTaskContext } from '../contexts/TaskContext';
