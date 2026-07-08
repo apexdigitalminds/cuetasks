@@ -35,8 +35,34 @@ interface TaskProviderProps {
 }
 
 export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  // Initialise straight from localStorage so the first render already has the
+  // persisted data. (A prior load-via-useEffect raced the save effect and could
+  // wipe stored tasks on mount — notably under React StrictMode's double-invoke.)
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    try {
+      const saved = localStorage.getItem('tasks');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (error) {
+      console.warn('Failed to load tasks from localStorage:', error);
+      localStorage.removeItem('tasks');
+    }
+    return [];
+  });
+  const [categories, setCategories] = useState<Category[]>(() => {
+    try {
+      const saved = localStorage.getItem('categories');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (error) {
+      console.warn('Failed to load categories from localStorage:', error);
+    }
+    return DEFAULT_CATEGORIES;
+  });
 
   const sortTasks = (tasksToSort: Task[]): Task[] => {
     return [...tasksToSort].sort((a, b) => {
@@ -66,37 +92,6 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
 
     window.addEventListener('completeTaskFromNotification', handleCompleteFromNotification);
     return () => window.removeEventListener('completeTaskFromNotification', handleCompleteFromNotification);
-  }, []);
-
-  // Load tasks from localStorage
-  useEffect(() => {
-    try {
-      const savedTasks = localStorage.getItem('tasks');
-      if (savedTasks) {
-        const parsedTasks = JSON.parse(savedTasks);
-        if (Array.isArray(parsedTasks)) {
-          setTasks(parsedTasks);
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to load tasks from localStorage:', error);
-      localStorage.removeItem('tasks');
-    }
-  }, []);
-
-  // Load categories from localStorage
-  useEffect(() => {
-    try {
-      const savedCategories = localStorage.getItem('categories');
-      if (savedCategories) {
-        const parsedCategories = JSON.parse(savedCategories);
-        if (Array.isArray(parsedCategories) && parsedCategories.length > 0) {
-          setCategories(parsedCategories);
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to load categories from localStorage:', error);
-    }
   }, []);
 
   // Save tasks to localStorage

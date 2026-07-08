@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import TaskItem from './TaskItem';
 import { Task } from '../types';
-import { CheckCheck, ListTodo, Filter } from 'lucide-react';
+import { CheckCheck, ListTodo, Filter, AlertTriangle } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
+import { isOverdue } from '../utils/dateUtils';
 
 interface TaskListProps {
   tasks: Task[];
@@ -31,6 +32,8 @@ const TaskList: React.FC<TaskListProps> = ({ tasks }) => {
 
   const activeCount = tasks.filter(task => !task.completed).length;
   const completedCount = tasks.filter(task => task.completed).length;
+  const overdueCount = tasks.filter(task => isOverdue(task.dateTime, task.completed)).length;
+  const completionRate = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -85,7 +88,28 @@ const TaskList: React.FC<TaskListProps> = ({ tasks }) => {
             </div>
             <span>{completedCount} done</span>
           </div>
+          {overdueCount > 0 && (
+            <div className="flex items-center text-sm text-red-600 dark:text-red-400">
+              <div className="w-6 h-6 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-2">
+                <AlertTriangle size={14} className="text-red-600 dark:text-red-400" />
+              </div>
+              <span>{overdueCount} overdue</span>
+            </div>
+          )}
         </div>
+
+        {/* Completion progress */}
+        {tasks.length > 0 && (
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${completionRate}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 tabular-nums">{completionRate}%</span>
+          </div>
+        )}
 
         {/* Category Filter Pills */}
         <div className="flex flex-wrap gap-2 mt-4">

@@ -105,6 +105,16 @@ export const getDayName = (dateString: string): string => {
   return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date);
 };
 
+export const isOverdue = (dateTime: string, completed: boolean): boolean => {
+  // A task is overdue if it has a due time in the past and isn't done yet.
+  if (completed || !dateTime || dateTime.trim() === '') return false;
+
+  const date = new Date(dateTime);
+  if (isNaN(date.getTime())) return false;
+
+  return date.getTime() < Date.now();
+};
+
 export const isSameDay = (date1: string, date2: string): boolean => {
   // Handle empty or invalid dates
   if (!date1 || !date2) return false;

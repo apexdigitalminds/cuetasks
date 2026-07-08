@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Trash2, Check, Clock, Bell, Edit3, Save, X, ArrowUp, ArrowDown, Star, Calendar, Repeat } from 'lucide-react';
+import { Trash2, Check, Clock, Bell, Edit3, Save, X, ArrowUp, ArrowDown, Star, Calendar, Repeat, AlertTriangle } from 'lucide-react';
 import { Task } from '../types';
-import { formatTimeOnlyWithTimezone, getLocalDateTimeString } from '../utils/dateUtils';
+import { formatTimeOnlyWithTimezone, getLocalDateTimeString, isOverdue } from '../utils/dateUtils';
 import { useTaskContext } from '../contexts/TaskContext';
 
 interface TaskItemProps {
@@ -19,6 +19,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const [editedCategoryId, setEditedCategoryId] = useState(task.categoryId || '');
 
   const category = task.categoryId ? getCategoryById(task.categoryId) : undefined;
+  const overdue = isOverdue(task.dateTime, task.completed);
+
+  // Left spine: category colour for active tasks, green once completed (a functional
+  // "done" signal). Overdue is signalled by the badge + border, never the spine.
+  const spineColor = task.completed ? '#22c55e' : category?.color;
 
   const handleToggleStatus = () => {
     toggleTaskStatus(task.id);
@@ -112,8 +117,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     <div
       className={`group relative flex items-start p-4 mb-3 rounded-xl border transition-all duration-300 ${task.completed
         ? 'bg-gray-50/50 dark:bg-gray-800/30 border-gray-100 dark:border-gray-800'
-        : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md'
+        : overdue
+          ? 'bg-white dark:bg-gray-800 border-red-200 dark:border-red-900/50 shadow-sm hover:shadow-md'
+          : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md'
         } ${isDeleting ? 'opacity-0 scale-95 translate-x-4' : 'opacity-100 scale-100'}`}
+      style={spineColor ? { borderLeftColor: spineColor, borderLeftWidth: '4px' } : undefined}
     >
       {/* Checkbox */}
       <button
@@ -259,9 +267,17 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
 
               {/* Time */}
               {task.dateTime && (
-                <span className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                <span className={`flex items-center text-xs ${overdue ? 'text-red-500 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
                   <Clock size={12} className="mr-1" />
                   {formatTimeOnlyWithTimezone(task.dateTime)}
+                </span>
+              )}
+
+              {/* Overdue badge */}
+              {overdue && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400">
+                  <AlertTriangle size={11} />
+                  Overdue
                 </span>
               )}
 
