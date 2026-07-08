@@ -60,6 +60,7 @@ The **TaskVoice → CueTasks** rename is complete across `index.html`, `src/App.
 - **Primary gradient** (`gradient-primary` in `src/index.css`): `#6366F1 → #8B5CF6 → #3B82F6` (also the logo gradient)
 - **Secondary:** blue `#3B82F6` · **Dark:** `#0F172A` · **Light surface:** `#F1F5F9`
 - **Category accents (only):** green `#22C55E`, amber `#F59E0B`, pink `#EC4899`
+- **Status colours — one job each (don't overload):** category colour = a task's left **spine** (identity); green `#22C55E` = done / progress; amber `#F59E0B` = priority (starred); red (`red-*`) = overdue. Indigo→violet is the brand hero and is **never** a status colour. Overdue detection lives in `isOverdue()` (`src/utils/dateUtils.ts`); the accents render in `TaskItem`/`TaskList`.
 - **Logo:** `src/components/Logo.tsx` — the reusable SVG brand mark (cue swoosh + check + sound waves). Use this component, don't inline the SVG.
 - **App/PWA icon:** `public/icon.svg` — same mark in white on a gradient tile. `favicon.ico` in `public/` is still the old raster icon and should be regenerated from `icon.svg`.
 

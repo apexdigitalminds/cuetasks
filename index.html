@@ -18,7 +18,10 @@
         min-height: 100vh;
         background-color: #f3f4f6;
       }
-      
+      html.dark #root {
+        background-color: #0f172a;
+      }
+
       /* Loading spinner for initial load */
       .loading-spinner {
         display: inline-block;
@@ -35,6 +38,16 @@
         100% { transform: rotate(360deg); }
       }
     </style>
+    <script>
+      // Apply saved theme before first paint (default dark) to avoid a flash.
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var dark = saved ? saved === 'dark' : true;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root">
