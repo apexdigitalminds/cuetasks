@@ -13,7 +13,7 @@ Originally scaffolded on Bolt.new (`bolt-vite-react-ts` template), now migrated 
 - **React 18** + **TypeScript** + **Vite 5**
 - **Tailwind CSS 3** for styling
 - **lucide-react** for icons (per Bolt convention: use lucide-react for logos/icons; do not add other UI/icon libraries unless requested)
-- No backend — state persists to `localStorage` (keys: `tasks`, `categories`, `theme`); a **service worker** (`public/sw.js`) handles offline caching and background reminder notifications (uses IndexedDB `CueTasksDB`)
+- No backend — state persists to `localStorage` (keys: `tasks`, `categories`, `theme`, `notificationSettings`); a **service worker** (`public/sw.js`) handles offline caching and background reminder notifications (uses IndexedDB `CueTasksDB`). A Supabase backend for sync/sharing/email + a Hermes MCP integration are designed in `docs/backend-architecture.md` (not yet built).
 - Browser APIs: Web Speech API (voice), Web Audio API (alert sounds), Notifications API, Vibration API
 
 ## Commands
