@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Palette } from 'lucide-react';
+import { X, Plus, Trash2, Settings as SettingsIcon, Bell } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
 import { DEFAULT_CATEGORIES } from '../types';
+import NotificationSettings from './NotificationSettings';
 
 interface CategoryManagerProps {
     isOpen: boolean;
@@ -77,8 +78,8 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Palette size={20} className="text-indigo-500" />
-                        Manage Categories
+                        <SettingsIcon size={20} className="text-indigo-500" />
+                        Settings
                     </h2>
                     <button
                         onClick={onClose}
@@ -91,6 +92,15 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
 
                 {/* Content */}
                 <div className="p-5 overflow-y-auto max-h-[60vh]">
+                    {/* Notifications */}
+                    <div className="mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <Bell size={15} className="text-gray-400" />
+                            Notifications
+                        </label>
+                        <NotificationSettings />
+                    </div>
+
                     {/* Add New Category */}
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

@@ -1,4 +1,5 @@
 // Audio notification utilities
+import { getNotificationSettings } from './notificationSettings';
 
 // webkitAudioContext is the non-standard Safari prefix, absent from DOM typings.
 declare global {
@@ -66,8 +67,9 @@ export const vibrateDevice = (pattern: number[] = [200, 100, 200]): boolean => {
     return false;
 };
 
-// Combined notification alert (sound + vibration)
+// Combined notification alert (sound + vibration), gated by user settings.
 export const alertUser = async (): Promise<void> => {
-    await playNotificationSound();
-    vibrateDevice([200, 100, 200, 100, 200]);
+    const { sound, vibrate } = getNotificationSettings();
+    if (sound) await playNotificationSound();
+    if (vibrate) vibrateDevice([200, 100, 200, 100, 200]);
 };

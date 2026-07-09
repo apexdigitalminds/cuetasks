@@ -1,13 +1,30 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Task } from '../types';
 import { alertUser } from './audio';
+import { getNotificationSettings } from './notificationSettings';
 
 interface ReminderCallback {
     (taskId: string, taskTitle: string, message: string): void;
 }
 
-// Track which reminders have been fired to avoid duplicates
-const firedReminders = new Set<string>();
+// Track which alerts have already fired to avoid duplicates.
+const firedReminders = new Set<string>();  // lead-time ("before due") reminders
+const firedDueAlerts = new Set<string>();  // "due now" alerts
+
+// Play sound/vibration (per settings), raise an in-app toast, and a browser notification.
+function fireReminder(task: Task, message: string, onReminder: ReminderCallback) {
+    console.log('[ReminderChecker] Firing reminder for:', task.title);
+    alertUser();
+    onReminder(task.id, task.title, message);
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(`⏰ ${task.title}`, {
+            body: message,
+            icon: '/icon-192.png',
+            tag: `reminder-${task.id}`,
+            requireInteraction: true,
+        });
+    }
+}
 
 export function useReminderChecker(
     tasks: Task[],
@@ -23,50 +40,40 @@ export function useReminderChecker(
 
     const checkReminders = useCallback(() => {
         const now = Date.now();
+        const settings = getNotificationSettings();
 
         for (const task of tasksRef.current) {
-            // Skip if no reminder, already completed, or already fired
-            if (!task.reminder?.enabled || task.completed) continue;
-            if (!task.dateTime) continue;
-            if (firedReminders.has(task.id)) continue;
+            if (task.completed || !task.dateTime) continue;
 
             try {
                 const taskDate = new Date(task.dateTime).getTime();
-                const reminderTime = taskDate - (task.reminder.minutesBefore * 60 * 1000);
+                if (isNaN(taskDate)) continue;
 
-                // Check if reminder time has passed but task isn't due yet
-                if (now >= reminderTime && now < taskDate) {
-                    console.log('[ReminderChecker] Firing reminder for:', task.title);
-
-                    // Mark as fired to prevent duplicates
-                    firedReminders.add(task.id);
-
-                    // Play sound and vibrate
-                    alertUser();
-
-                    // Calculate time until due
-                    const minutesUntilDue = Math.round((taskDate - now) / 60000);
-                    const message = minutesUntilDue <= 1
-                        ? 'Due in less than a minute!'
-                        : `Due in ${minutesUntilDue} minutes`;
-
-                    // Trigger callback for toast notification
-                    onReminder(task.id, task.title, message);
-
-                    // Also try browser notification
-                    if ('Notification' in window && Notification.permission === 'granted') {
-                        new Notification(`⏰ ${task.title}`, {
-                            body: message,
-                            icon: '/icons/icon-192.png',
-                            tag: `reminder-${task.id}`,
-                            requireInteraction: true
-                        });
+                // Lead-time reminder ("X minutes before due") — needs a per-task reminder.
+                if (settings.remindBefore && task.reminder?.enabled && !firedReminders.has(task.id)) {
+                    const reminderTime = taskDate - (task.reminder.minutesBefore * 60 * 1000);
+                    if (now >= reminderTime && now < taskDate) {
+                        firedReminders.add(task.id);
+                        const minutesUntilDue = Math.round((taskDate - now) / 60000);
+                        const message = minutesUntilDue <= 1
+                            ? 'Due in less than a minute!'
+                            : `Due in ${minutesUntilDue} minutes`;
+                        fireReminder(task, message, onReminder);
                     }
                 }
 
-                // Clean up old entries when task is past due
-                if (now > taskDate + 3600000) { // 1 hour past due
+                // Due alert — fires once when any dated task reaches its due time.
+                if (settings.alertOnDue && !firedDueAlerts.has(task.id)) {
+                    if (now >= taskDate && now < taskDate + 3600000) {
+                        firedDueAlerts.add(task.id);
+                        fireReminder(task, 'Due now', onReminder);
+                    }
+                }
+
+                // Clean up once well past due so the sets don't grow unbounded.
+                if (now > taskDate + 3600000) {
                     firedReminders.delete(task.id);
+                    firedDueAlerts.delete(task.id);
                 }
             } catch (error) {
                 console.warn('[ReminderChecker] Error processing task:', task.id, error);
@@ -104,9 +111,10 @@ export function useReminderChecker(
         return () => document.removeEventListener('visibilitychange', handleVisibility);
     }, [checkReminders]);
 
-    // Clear fired reminder when task is completed or deleted
+    // Clear fired alerts when task is completed or deleted
     const clearFiredReminder = useCallback((taskId: string) => {
         firedReminders.delete(taskId);
+        firedDueAlerts.delete(taskId);
     }, []);
 
     return { clearFiredReminder };
@@ -115,4 +123,5 @@ export function useReminderChecker(
 // Export for resetting on task edit
 export function resetFiredReminder(taskId: string) {
     firedReminders.delete(taskId);
+    firedDueAlerts.delete(taskId);
 }

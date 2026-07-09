@@ -256,7 +256,7 @@ const AppContent: React.FC = () => {
               className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 
                          transition-all duration-200 text-gray-600 dark:text-gray-300"
               aria-label="Settings"
-              title="Manage Categories"
+              title="Settings"
             >
               <Settings size={20} />
             </button>
