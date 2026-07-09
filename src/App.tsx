@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Sun, Moon, Bell, BellOff, BellRing, Settings, BarChart3 } from 'lucide-react';
+import { Sun, Moon, Bell, BellOff, BellRing, Settings, BarChart3, LogIn, User } from 'lucide-react';
 import { TaskProvider, useTaskContext } from './contexts/TaskContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Logo from './components/Logo';
+import AuthModal from './components/AuthModal';
 import TaskForm from './components/TaskForm';
 import TaskList from './components/TaskList';
 import DailySummary from './components/DailySummary';
@@ -121,12 +123,43 @@ const ThemeToggle: React.FC = () => {
   );
 };
 
+// Account button — only shown when cloud sync is configured.
+const AccountButton: React.FC<{ onSignIn: () => void }> = ({ onSignIn }) => {
+  const { configured, user, signOut } = useAuth();
+  if (!configured) return null;
+
+  if (user) {
+    return (
+      <button
+        onClick={() => signOut()}
+        className="p-2.5 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition-all duration-200"
+        aria-label="Sign out"
+        title={`Signed in as ${user.email} — click to sign out`}
+      >
+        <User size={20} />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={onSignIn}
+      className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200"
+      aria-label="Sign in"
+      title="Sign in to sync across devices"
+    >
+      <LogIn size={20} />
+    </button>
+  );
+};
+
 const AppContent: React.FC = () => {
   const taskContext = useTaskContext();
   const [selectedDate, setSelectedDate] = useState(getToday());
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   // Callback for when a reminder fires
   const handleReminderFired = useCallback((taskId: string, taskTitle: string, message: string) => {
@@ -229,6 +262,9 @@ const AppContent: React.FC = () => {
       {/* Task History Modal */}
       <TaskHistory isOpen={showHistory} onClose={() => setShowHistory(false)} />
 
+      {/* Auth Modal */}
+      <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
+
       {/* Header */}
       <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-b border-gray-200/50 dark:border-gray-700/50 
                         py-4 px-4 sm:px-6 fixed top-0 w-full z-40">
@@ -260,6 +296,7 @@ const AppContent: React.FC = () => {
             >
               <Settings size={20} />
             </button>
+            <AccountButton onSignIn={() => setShowAuth(true)} />
             <NotificationButton />
             <ThemeToggle />
           </div>
@@ -305,9 +342,11 @@ const AppContent: React.FC = () => {
 
 function App() {
   return (
-    <TaskProvider>
-      <AppContent />
-    </TaskProvider>
+    <AuthProvider>
+      <TaskProvider>
+        <AppContent />
+      </TaskProvider>
+    </AuthProvider>
   );
 }
 
