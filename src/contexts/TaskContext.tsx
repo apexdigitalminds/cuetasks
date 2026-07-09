@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Task, TaskReminder, Category, DEFAULT_CATEGORIES, RecurrencePattern } from '../types';
 import { isSameDay } from '../utils/dateUtils';
 import { getNextOccurrenceDate, isRecurrenceEnded } from '../utils/recurrence';
+import { useAuth } from './AuthContext';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { pullAll, pushReconcile, migrateToUuids, newId } from '../lib/sync';
 
 interface TaskContextType {
   tasks: Task[];
@@ -64,6 +67,17 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     return DEFAULT_CATEGORIES;
   });
 
+  // ── Cloud sync state ──
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const tasksRef = useRef(tasks);
+  const categoriesRef = useRef(categories);
+  const initialSyncedFor = useRef<string | null>(null); // userId whose initial sync completed
+  const syncingRef = useRef(false);
+
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  useEffect(() => { categoriesRef.current = categories; }, [categories]);
+
   const sortTasks = (tasksToSort: Task[]): Task[] => {
     return [...tasksToSort].sort((a, b) => {
       if (a.starred && !b.starred) return -1;
@@ -112,10 +126,59 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     }
   }, [categories]);
 
+  // ── Initial sync on sign-in ──
+  // If the cloud is empty, migrate the local set up (assigning UUIDs). Otherwise
+  // the cloud is authoritative and we adopt it. localStorage stays the offline cache.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !userId) {
+      if (!userId) initialSyncedFor.current = null;
+      return;
+    }
+    if (initialSyncedFor.current === userId) return;
+
+    let cancelled = false;
+    (async () => {
+      syncingRef.current = true;
+      try {
+        const cloud = await pullAll();
+        if (cancelled || !cloud) return;
+
+        if (cloud.categories.length === 0 && cloud.tasks.length === 0) {
+          const migrated = migrateToUuids(categoriesRef.current, tasksRef.current);
+          setCategories(migrated.categories);
+          setTasks(migrated.tasks);
+          await pushReconcile(userId, migrated.categories, migrated.tasks);
+        } else {
+          setCategories(cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES);
+          setTasks(cloud.tasks);
+        }
+        if (!cancelled) initialSyncedFor.current = userId;
+      } catch (error) {
+        console.warn('[sync] initial sync failed:', error);
+      } finally {
+        syncingRef.current = false;
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  // ── Push local changes to the cloud (debounced) ──
+  useEffect(() => {
+    if (!isSupabaseConfigured || !userId) return;
+    if (syncingRef.current || initialSyncedFor.current !== userId) return;
+
+    const handle = setTimeout(() => {
+      pushReconcile(userId, categoriesRef.current, tasksRef.current)
+        .catch(error => console.warn('[sync] push failed:', error));
+    }, 800);
+    return () => clearTimeout(handle);
+  }, [tasks, categories, userId]);
+
   const addTask = (title: string, dateTime: string, reminder?: TaskReminder, categoryId?: string, recurrence?: RecurrencePattern) => {
-    const seriesId = recurrence ? Date.now().toString() : undefined;
+    const seriesId = recurrence ? newId() : undefined;
     const newTask: Task = {
-      id: Date.now().toString(),
+      id: newId(),
       title,
       dateTime: dateTime || '',
       completed: false,
@@ -167,7 +230,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
 
         if (nextDate) {
           const newOccurrence: Task = {
-            id: Date.now().toString(),
+            id: newId(),
             title: taskToToggle.title,
             dateTime: nextDate.toISOString().slice(0, 16), // Format as datetime-local
             completed: false,
@@ -287,7 +350,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   // Category management
   const addCategory = (name: string, color: string, icon: string) => {
     const newCategory: Category = {
-      id: Date.now().toString(),
+      id: newId(),
       name,
       color,
       icon
