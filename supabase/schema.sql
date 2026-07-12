@@ -172,6 +172,6 @@ create policy task_shares_owner on public.task_shares for all
 create policy task_shares_see_own on public.task_shares for select
   using (user_id = auth.uid());
 
--- ─────────────────────────── realtime (optional) ───────────────────────────
--- Enable live sync across devices/clients:
--- alter publication supabase_realtime add table public.tasks, public.categories;
+-- ─────────────────────────── realtime ───────────────────────────
+-- Live sync across devices/clients. (On an existing DB, run just this line.)
+alter publication supabase_realtime add table public.tasks, public.categories;

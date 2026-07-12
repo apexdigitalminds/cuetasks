@@ -3,8 +3,12 @@ import { Task, TaskReminder, Category, DEFAULT_CATEGORIES, RecurrencePattern } f
 import { isSameDay } from '../utils/dateUtils';
 import { getNextOccurrenceDate, isRecurrenceEnded } from '../utils/recurrence';
 import { useAuth } from './AuthContext';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { pullAll, pushReconcile, migrateToUuids, newId } from '../lib/sync';
+
+// Serialised view of the working set; used to skip redundant/echoed cloud pushes.
+const syncSnapshot = (categories: Category[], tasks: Task[]): string =>
+  JSON.stringify({ categories, tasks });
 
 interface TaskContextType {
   tasks: Task[];
@@ -74,6 +78,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   const categoriesRef = useRef(categories);
   const initialSyncedFor = useRef<string | null>(null); // userId whose initial sync completed
   const syncingRef = useRef(false);
+  const lastSyncedSnapshot = useRef<string>(''); // serialised state last known in sync with cloud
 
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => { categoriesRef.current = categories; }, [categories]);
@@ -143,16 +148,25 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
         const cloud = await pullAll();
         if (cancelled || !cloud) return;
 
+        let finalCats: Category[];
+        let finalTasks: Task[];
         if (cloud.categories.length === 0 && cloud.tasks.length === 0) {
           const migrated = migrateToUuids(categoriesRef.current, tasksRef.current);
-          setCategories(migrated.categories);
-          setTasks(migrated.tasks);
-          await pushReconcile(userId, migrated.categories, migrated.tasks);
+          finalCats = migrated.categories;
+          finalTasks = migrated.tasks;
+          setCategories(finalCats);
+          setTasks(finalTasks);
+          await pushReconcile(userId, finalCats, finalTasks);
         } else {
-          setCategories(cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES);
-          setTasks(cloud.tasks);
+          finalCats = cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES;
+          finalTasks = cloud.tasks;
+          setCategories(finalCats);
+          setTasks(finalTasks);
         }
-        if (!cancelled) initialSyncedFor.current = userId;
+        if (!cancelled) {
+          lastSyncedSnapshot.current = syncSnapshot(finalCats, finalTasks);
+          initialSyncedFor.current = userId;
+        }
       } catch (error) {
         console.warn('[sync] initial sync failed:', error);
       } finally {
@@ -167,13 +181,52 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) return;
     if (syncingRef.current || initialSyncedFor.current !== userId) return;
+    // Skip if the current state already matches the cloud (e.g. a realtime echo).
+    if (syncSnapshot(categories, tasks) === lastSyncedSnapshot.current) return;
 
     const handle = setTimeout(() => {
-      pushReconcile(userId, categoriesRef.current, tasksRef.current)
+      pushReconcile(userId, categories, tasks)
+        .then(() => { lastSyncedSnapshot.current = syncSnapshot(categories, tasks); })
         .catch(error => console.warn('[sync] push failed:', error));
     }, 800);
     return () => clearTimeout(handle);
   }, [tasks, categories, userId]);
+
+  // ── Realtime: apply remote changes live (no reload) ──
+  useEffect(() => {
+    if (!isSupabaseConfigured || !userId || !supabase) return;
+    const sb = supabase;
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(async () => {
+        if (initialSyncedFor.current !== userId) return;
+        try {
+          const cloud = await pullAll();
+          if (!cloud) return;
+          const cats = cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES;
+          // Set the snapshot first so the push effect treats this as in-sync.
+          lastSyncedSnapshot.current = syncSnapshot(cats, cloud.tasks);
+          setCategories(cats);
+          setTasks(cloud.tasks);
+        } catch (error) {
+          console.warn('[sync] realtime refresh failed:', error);
+        }
+      }, 300);
+    };
+
+    const channel = sb
+      .channel(`cuetasks-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, scheduleRefresh)
+      .subscribe();
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      sb.removeChannel(channel);
+    };
+  }, [userId]);
 
   const addTask = (title: string, dateTime: string, reminder?: TaskReminder, categoryId?: string, recurrence?: RecurrencePattern) => {
     const seriesId = recurrence ? newId() : undefined;
