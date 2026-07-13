@@ -80,6 +80,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   const initialSyncedFor = useRef<string | null>(null); // userId whose initial sync completed
   const syncingRef = useRef(false);
   const lastSyncedSnapshot = useRef<string>(''); // serialised state last known in sync with cloud
+  const prevUserId = useRef<string | null>(null);
 
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => { categoriesRef.current = categories; }, [categories]);
@@ -131,6 +132,19 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       console.warn('Failed to save categories to localStorage:', error);
     }
   }, [categories]);
+
+  // ── On sign-out, clear the working set ──
+  // Prevents another account on the same device from inheriting the previous
+  // user's tasks (their data stays safe in the cloud and returns on sign-in).
+  useEffect(() => {
+    if (prevUserId.current && !userId) {
+      initialSyncedFor.current = null;
+      lastSyncedSnapshot.current = '';
+      setTasks([]);
+      setCategories(DEFAULT_CATEGORIES);
+    }
+    prevUserId.current = userId;
+  }, [userId]);
 
   // ── Initial sync on sign-in ──
   // If the cloud is empty, migrate the local set up (assigning UUIDs). Otherwise
