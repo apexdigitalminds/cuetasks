@@ -4,6 +4,7 @@ import { TaskProvider, useTaskContext } from './contexts/TaskContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Logo from './components/Logo';
 import AuthModal from './components/AuthModal';
+import { redeemShareLink } from './lib/sharing';
 import TaskForm from './components/TaskForm';
 import TaskList from './components/TaskList';
 import DailySummary from './components/DailySummary';
@@ -160,6 +161,40 @@ const AppContent: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const { user } = useAuth();
+  const [pendingJoin, setPendingJoin] = useState<string | null>(null);
+
+  // Capture a share-link token (?join=…) from the URL on load, then clean it up.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('join');
+    if (token) {
+      setPendingJoin(token);
+      params.delete('join');
+      const rest = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
+    }
+  }, []);
+
+  // Redeem the link once signed in (prompt sign-in first if needed).
+  useEffect(() => {
+    if (!pendingJoin || !taskContext) return;
+    if (!user) { setShowAuth(true); return; }
+    let cancelled = false;
+    (async () => {
+      const res = await redeemShareLink(pendingJoin);
+      if (cancelled) return;
+      setPendingJoin(null);
+      if (res.ok) {
+        await taskContext.refreshFromCloud();
+        setToasts(prev => [...prev, { id: `join-${Date.now()}`, title: 'Shared with you', message: 'The shared list is now in your account.', type: 'success' }]);
+      } else {
+        setToasts(prev => [...prev, { id: `join-${Date.now()}`, title: 'Could not join', message: res.error || 'This link may be invalid or expired.', type: 'info' }]);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJoin, user]);
 
   // Callback for when a reminder fires
   const handleReminderFired = useCallback((taskId: string, taskTitle: string, message: string) => {

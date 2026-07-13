@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Trash2, Check, Clock, Bell, Edit3, Save, X, ArrowUp, ArrowDown, Star, Calendar, Repeat, AlertTriangle } from 'lucide-react';
+import { Trash2, Check, Clock, Bell, Edit3, Save, X, ArrowUp, ArrowDown, Star, Calendar, Repeat, AlertTriangle, Share2 } from 'lucide-react';
 import { Task } from '../types';
 import { formatTimeOnlyWithTimezone, getLocalDateTimeString, isOverdue } from '../utils/dateUtils';
 import { useTaskContext } from '../contexts/TaskContext';
+import { useAuth } from '../contexts/AuthContext';
+import ShareModal from './ShareModal';
 
 interface TaskItemProps {
   task: Task;
@@ -10,6 +12,9 @@ interface TaskItemProps {
 
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const { toggleTaskStatus, deleteTask, editTask, toggleTaskStar, moveTaskUp, moveTaskDown, categories, getCategoryById } = useTaskContext();
+  const { user, configured } = useAuth();
+  const canShare = !!(configured && user && (!task.ownerId || task.ownerId === user.id));
+  const [showShare, setShowShare] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task.title);
@@ -338,6 +343,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
             </>
           )}
 
+          {canShare && (
+            <button
+              onClick={() => setShowShare(true)}
+              className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all"
+              aria-label="Share task"
+            >
+              <Share2 size={14} />
+            </button>
+          )}
+
           <button
             onClick={handleEdit}
             className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all"
@@ -362,6 +377,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
           <Star size={10} className="text-white" fill="white" />
         </div>
       )}
+
+      <ShareModal
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        resourceType="task"
+        resourceId={task.id}
+        resourceName={task.title}
+      />
     </div>
   );
 };

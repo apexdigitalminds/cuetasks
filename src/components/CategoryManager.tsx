@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Settings as SettingsIcon, Bell } from 'lucide-react';
+import { X, Plus, Trash2, Settings as SettingsIcon, Bell, Share2 } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
-import { DEFAULT_CATEGORIES } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { DEFAULT_CATEGORIES, Category } from '../types';
 import NotificationSettings from './NotificationSettings';
+import ShareModal from './ShareModal';
 
 interface CategoryManagerProps {
     isOpen: boolean;
@@ -28,6 +30,9 @@ const PRESET_ICONS = ['📁', '🎯', '📝', '🏃', '🎨', '📚', '🎮', '�
 
 const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) => {
     const { categories, addCategory, deleteCategory } = useTaskContext();
+    const { user, configured } = useAuth();
+    const [shareCategory, setShareCategory] = useState<Category | null>(null);
+    const canShare = (c: Category) => !!(configured && user && (!c.ownerId || c.ownerId === user.id));
     const [newName, setNewName] = useState('');
     const [newColor, setNewColor] = useState(PRESET_COLORS[0]);
     const [newIcon, setNewIcon] = useState('📁');
@@ -216,21 +221,42 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
                                         )}
                                     </div>
 
-                                    {!isDefaultCategory(category.id) && (
-                                        <button
-                                            onClick={() => deleteCategory(category.id)}
-                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 
-                               rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    )}
+                                    <div className="flex items-center gap-1">
+                                        {canShare(category) && (
+                                            <button
+                                                onClick={() => setShareCategory(category)}
+                                                aria-label="Share list"
+                                                className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                            >
+                                                <Share2 size={16} />
+                                            </button>
+                                        )}
+                                        {!isDefaultCategory(category.id) && (
+                                            <button
+                                                onClick={() => deleteCategory(category.id)}
+                                                aria-label="Delete category"
+                                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {shareCategory && (
+                <ShareModal
+                    isOpen={true}
+                    onClose={() => setShareCategory(null)}
+                    resourceType="category"
+                    resourceId={shareCategory.id}
+                    resourceName={shareCategory.name}
+                />
+            )}
         </div>
     );
 };

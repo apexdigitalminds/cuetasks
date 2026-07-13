@@ -41,10 +41,10 @@ const toIso = (dt?: string): string | null => {
   return isNaN(d.getTime()) ? null : d.toISOString();
 };
 
-function taskToRow(t: Task, userId: string): TaskRow {
+// Mutable columns (everything except id / owner_id / created_at) — used for
+// updating shared rows we don't own but may edit.
+function taskMutable(t: Task) {
   return {
-    id: t.id,
-    owner_id: userId,
     category_id: t.categoryId ?? null,
     title: t.title,
     due_at: toIso(t.dateTime),
@@ -56,8 +56,11 @@ function taskToRow(t: Task, userId: string): TaskRow {
     reminder_minutes_before: t.reminder?.minutesBefore ?? 15,
     recurrence: t.recurrence ?? null,
     series_id: t.seriesId && isUuid(t.seriesId) ? t.seriesId : null,
-    created_at: t.createdAt,
   };
+}
+
+function taskToRow(t: Task, userId: string): TaskRow {
+  return { id: t.id, owner_id: t.ownerId ?? userId, created_at: t.createdAt, ...taskMutable(t) };
 }
 
 function rowToTask(r: TaskRow): Task {
@@ -74,15 +77,16 @@ function rowToTask(r: TaskRow): Task {
     categoryId: r.category_id ?? undefined,
     recurrence: r.recurrence ?? undefined,
     seriesId: r.series_id ?? undefined,
+    ownerId: r.owner_id,
   };
 }
 
+const categoryMutable = (c: Category) => ({ name: c.name, color: c.color, icon: c.icon ?? null });
+
 const categoryToRow = (c: Category, userId: string): CategoryRow => ({
   id: c.id,
-  owner_id: userId,
-  name: c.name,
-  color: c.color,
-  icon: c.icon ?? null,
+  owner_id: c.ownerId ?? userId,
+  ...categoryMutable(c),
 });
 
 const rowToCategory = (r: CategoryRow): Category => ({
@@ -90,6 +94,7 @@ const rowToCategory = (r: CategoryRow): Category => ({
   name: r.name,
   color: r.color,
   icon: r.icon ?? undefined,
+  ownerId: r.owner_id,
 });
 
 // Give any non-UUID local ids fresh UUIDs, remapping task→category references.
@@ -124,26 +129,46 @@ export async function pullAll(): Promise<{ categories: Category[]; tasks: Task[]
   };
 }
 
-// Upsert the current set and delete cloud rows that no longer exist locally.
+const mine = <T extends { ownerId?: string }>(items: T[], userId: string) =>
+  items.filter(i => !i.ownerId || i.ownerId === userId);
+const shared = <T extends { ownerId?: string }>(items: T[], userId: string) =>
+  items.filter(i => i.ownerId && i.ownerId !== userId);
+
+// Push local changes to the cloud, respecting ownership:
+//  * own rows        → upsert (and delete our own rows that are gone locally)
+//  * shared rows      → update mutable fields only (RLS lets editors through,
+//                       silently no-ops for viewers); never inserted or deleted
 export async function pushReconcile(userId: string, categories: Category[], tasks: Task[]): Promise<void> {
   if (!supabase) return;
 
-  if (categories.length) {
-    const { error } = await supabase.from('categories').upsert(categories.map(c => categoryToRow(c, userId)));
+  const myCats = mine(categories, userId);
+  const myTasks = mine(tasks, userId);
+
+  if (myCats.length) {
+    const { error } = await supabase.from('categories').upsert(myCats.map(c => categoryToRow(c, userId)));
     if (error) throw error;
   }
-  if (tasks.length) {
-    const { error } = await supabase.from('tasks').upsert(tasks.map(t => taskToRow(t, userId)));
+  if (myTasks.length) {
+    const { error } = await supabase.from('tasks').upsert(myTasks.map(t => taskToRow(t, userId)));
     if (error) throw error;
   }
 
-  const localTaskIds = new Set(tasks.map(t => t.id));
-  const cloudTasks = await supabase.from('tasks').select('id');
-  const staleTasks = (cloudTasks.data ?? []).map(r => r.id).filter(id => !localTaskIds.has(id));
+  // Shared rows I may edit — update only; RLS enforces editor vs viewer.
+  for (const t of shared(tasks, userId)) {
+    await supabase.from('tasks').update(taskMutable(t)).eq('id', t.id);
+  }
+  for (const c of shared(categories, userId)) {
+    await supabase.from('categories').update(categoryMutable(c)).eq('id', c.id);
+  }
+
+  // Delete only our OWN cloud rows that no longer exist locally.
+  const myTaskIds = new Set(myTasks.map(t => t.id));
+  const cloudTasks = await supabase.from('tasks').select('id').eq('owner_id', userId);
+  const staleTasks = (cloudTasks.data ?? []).map(r => r.id).filter(id => !myTaskIds.has(id));
   if (staleTasks.length) await supabase.from('tasks').delete().in('id', staleTasks);
 
-  const localCatIds = new Set(categories.map(c => c.id));
-  const cloudCats = await supabase.from('categories').select('id');
-  const staleCats = (cloudCats.data ?? []).map(r => r.id).filter(id => !localCatIds.has(id));
+  const myCatIds = new Set(myCats.map(c => c.id));
+  const cloudCats = await supabase.from('categories').select('id').eq('owner_id', userId);
+  const staleCats = (cloudCats.data ?? []).map(r => r.id).filter(id => !myCatIds.has(id));
   if (staleCats.length) await supabase.from('categories').delete().in('id', staleCats);
 }

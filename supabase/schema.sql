@@ -172,6 +172,59 @@ create policy task_shares_owner on public.task_shares for all
 create policy task_shares_see_own on public.task_shares for select
   using (user_id = auth.uid());
 
+-- ─────────────────────────── sharing: links + email invites ───────────────────────────
+-- Denormalised email so a list/task owner can see who it's shared with.
+alter table public.category_members add column if not exists invited_email text;
+alter table public.task_shares      add column if not exists invited_email text;
+
+-- Resolve a registered user's id by email (targeted email invites).
+create or replace function public.find_user_id_by_email(lookup_email text)
+returns uuid language sql security definer set search_path = public as $$
+  select id from auth.users where lower(email) = lower(lookup_email) limit 1;
+$$;
+revoke all on function public.find_user_id_by_email(text) from anon;
+grant execute on function public.find_user_id_by_email(text) to authenticated;
+
+-- Shareable links (send via any channel; redeemer joins on open).
+create table if not exists public.share_links (
+  token         uuid primary key default gen_random_uuid(),
+  resource_type text not null check (resource_type in ('category','task')),
+  resource_id   uuid not null,
+  role          text not null default 'viewer' check (role in ('viewer','editor')),
+  created_by    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  expires_at    timestamptz,
+  revoked       boolean not null default false
+);
+alter table public.share_links enable row level security;
+create policy share_links_owner on public.share_links for all
+  using (created_by = auth.uid()) with check (created_by = auth.uid());
+
+-- Redeem a link: add the caller to the resource with the link's role.
+create or replace function public.redeem_share_link(link_token uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  lnk public.share_links;
+  my_email text;
+begin
+  select * into lnk from public.share_links where token = link_token;
+  if lnk is null or lnk.revoked or (lnk.expires_at is not null and lnk.expires_at < now()) then
+    return jsonb_build_object('ok', false, 'error', 'This link is invalid or has expired');
+  end if;
+  select email into my_email from auth.users where id = auth.uid();
+  if lnk.resource_type = 'category' then
+    insert into public.category_members (category_id, user_id, role, invited_email)
+      values (lnk.resource_id, auth.uid(), lnk.role, my_email)
+      on conflict (category_id, user_id) do update set role = excluded.role;
+  else
+    insert into public.task_shares (task_id, user_id, role, invited_email)
+      values (lnk.resource_id, auth.uid(), lnk.role, my_email)
+      on conflict (task_id, user_id) do update set role = excluded.role;
+  end if;
+  return jsonb_build_object('ok', true, 'resource_type', lnk.resource_type);
+end $$;
+grant execute on function public.redeem_share_link(uuid) to authenticated;
+
 -- ─────────────────────────── realtime ───────────────────────────
 -- Live sync across devices/clients. (On an existing DB, run just this line.)
 alter publication supabase_realtime add table public.tasks, public.categories;

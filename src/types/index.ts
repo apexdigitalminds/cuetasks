@@ -3,6 +3,7 @@ export interface Category {
   name: string;
   color: string;
   icon?: string;
+  ownerId?: string;   // set when synced; distinguishes own vs shared lists
 }
 
 export interface TaskReminder {
@@ -34,6 +35,7 @@ export interface Task {
   categoryId?: string;
   recurrence?: RecurrencePattern;
   seriesId?: string;                 // Links all occurrences in a series
+  ownerId?: string;                  // set when synced; distinguishes own vs shared tasks
 }
 
 export type TaskContextType = {

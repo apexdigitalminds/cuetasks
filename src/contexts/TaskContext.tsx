@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Task, TaskReminder, Category, DEFAULT_CATEGORIES, RecurrencePattern } from '../types';
 import { isSameDay } from '../utils/dateUtils';
 import { getNextOccurrenceDate, isRecurrenceEnded } from '../utils/recurrence';
@@ -25,6 +25,7 @@ interface TaskContextType {
   addCategory: (name: string, color: string, icon: string) => void;
   deleteCategory: (id: string) => void;
   getCategoryById: (id: string) => Category | undefined;
+  refreshFromCloud: () => Promise<void>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -192,6 +193,22 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     return () => clearTimeout(handle);
   }, [tasks, categories, userId]);
 
+  // Pull the cloud set and apply it (used by realtime and after redeeming a link).
+  const refreshFromCloud = useCallback(async () => {
+    if (!isSupabaseConfigured || !userId) return;
+    try {
+      const cloud = await pullAll();
+      if (!cloud) return;
+      const cats = cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES;
+      // Set the snapshot first so the push effect treats this as in-sync.
+      lastSyncedSnapshot.current = syncSnapshot(cats, cloud.tasks);
+      setCategories(cats);
+      setTasks(cloud.tasks);
+    } catch (error) {
+      console.warn('[sync] refresh failed:', error);
+    }
+  }, [userId]);
+
   // ── Realtime: apply remote changes live (no reload) ──
   useEffect(() => {
     if (!isSupabaseConfigured || !userId || !supabase) return;
@@ -200,19 +217,8 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     const scheduleRefresh = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(async () => {
-        if (initialSyncedFor.current !== userId) return;
-        try {
-          const cloud = await pullAll();
-          if (!cloud) return;
-          const cats = cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES;
-          // Set the snapshot first so the push effect treats this as in-sync.
-          lastSyncedSnapshot.current = syncSnapshot(cats, cloud.tasks);
-          setCategories(cats);
-          setTasks(cloud.tasks);
-        } catch (error) {
-          console.warn('[sync] realtime refresh failed:', error);
-        }
+      refreshTimer = setTimeout(() => {
+        if (initialSyncedFor.current === userId) refreshFromCloud();
       }, 300);
     };
 
@@ -479,6 +485,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     addCategory,
     deleteCategory,
     getCategoryById,
+    refreshFromCloud,
   };
 
   return (
