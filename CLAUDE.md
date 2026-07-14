@@ -41,7 +41,7 @@ There is no test suite configured.
 - `src/main.tsx` — React entry point + service worker registration
 - `src/contexts/TaskContext.tsx` — global state for tasks and categories (single source of truth; persists to `localStorage`)
 - `src/types/index.ts` — core interfaces: `Task`, `Category`, `RecurrencePattern`
-- `src/components/` — UI: `TaskForm`, `TaskList`, `TaskItem`, `TaskHistory`, `CategoryManager`, `DailySummary`, `ThemeToggle`, `ToastNotification`, `Logo` (brand mark)
+- `src/components/` — UI: `TaskForm`, `TaskList`, `TaskItem`, `TaskHistory`, `CategoryManager` (Settings modal: appearance, notifications, categories, sharing), `DailySummary`, `ToastNotification`, `Logo`, `AuthModal`, `ShareModal`, `NotificationSettings`. Theme lives in `src/hooks/useTheme.ts`.
 - `src/utils/` — `speechRecognition.ts` (Web Speech wrapper), `recurrence.ts` (next-occurrence logic), `reminderChecker.ts` (in-app due-reminder polling), `audio.ts` (alert sounds), `dateUtils.ts`
 - `public/sw.js` — service worker: cache + background push/reminder checks
 

@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Settings as SettingsIcon, Bell, Share2 } from 'lucide-react';
+import { X, Plus, Trash2, Settings as SettingsIcon, Bell, Share2, Moon } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_CATEGORIES, Category } from '../types';
 import NotificationSettings from './NotificationSettings';
+import InstallSection from './InstallSection';
 import ShareModal from './ShareModal';
 
 interface CategoryManagerProps {
     isOpen: boolean;
     onClose: () => void;
+    isDark: boolean;
+    onToggleTheme: () => void;
 }
 
 const PRESET_COLORS = [
@@ -28,7 +31,7 @@ const PRESET_COLORS = [
 
 const PRESET_ICONS = ['📁', '🎯', '📝', '🏃', '🎨', '📚', '🎮', '🎵', '🏠', '💼', '🛒', '💡', '❤️', '⭐', '🔥', '✈️'];
 
-const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) => {
+const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose, isDark, onToggleTheme }) => {
     const { categories, addCategory, deleteCategory } = useTaskContext();
     const { user, configured } = useAuth();
     const [shareCategory, setShareCategory] = useState<Category | null>(null);
@@ -97,6 +100,32 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose }) =>
 
                 {/* Content */}
                 <div className="p-5 overflow-y-auto max-h-[60vh]">
+                    <InstallSection />
+
+                    {/* Appearance */}
+                    <div className="mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <Moon size={15} className="text-gray-400" />
+                            Appearance
+                        </label>
+                        <div className="flex items-center justify-between py-2">
+                            <div>
+                                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Dark mode</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Switch between light and dark</p>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={isDark}
+                                aria-label="Dark mode"
+                                onClick={onToggleTheme}
+                                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${isDark ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${isDark ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Notifications */}
                     <div className="mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

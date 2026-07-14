@@ -25,6 +25,7 @@ const TaskForm: React.FC = () => {
   const [recurrenceEndCount, setRecurrenceEndCount] = useState(10);
 
   const { addTask, categories } = useTaskContext();
+  const voiceSupported = speechRecognition.isSupported();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,17 +131,19 @@ const TaskForm: React.FC = () => {
                       rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400
                       focus:border-indigo-500 dark:text-gray-100 text-base placeholder:text-gray-400"
           />
-          <button
-            type="button"
-            onClick={handleVoiceInput}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all 
-                       ${isRecording
-                ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
-                : 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600'}`}
-            aria-label={isRecording ? 'Recording in progress' : 'Record voice input'}
-          >
-            <Mic size={18} />
-          </button>
+          {voiceSupported && (
+            <button
+              type="button"
+              onClick={handleVoiceInput}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all
+                         ${isRecording
+                  ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
+                  : 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600'}`}
+              aria-label={isRecording ? 'Recording in progress' : 'Record voice input'}
+            >
+              <Mic size={18} />
+            </button>
+          )}
         </div>
         {isRecording && (
           <p className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 animate-pulse flex items-center">

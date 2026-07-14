@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Sun, Moon, Bell, BellOff, BellRing, Settings, BarChart3, LogIn, User } from 'lucide-react';
+import { Bell, BellOff, BellRing, Settings, BarChart3, LogIn, User } from 'lucide-react';
 import { TaskProvider, useTaskContext } from './contexts/TaskContext';
+import { useTheme } from './hooks/useTheme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Logo from './components/Logo';
 import AuthModal from './components/AuthModal';
@@ -97,32 +98,6 @@ const NotificationButton: React.FC = () => {
   );
 };
 
-// Theme Toggle Component
-const ThemeToggle: React.FC = () => {
-  const [isDark, setIsDark] = useState(() => {
-    // Read the saved preference directly so it isn't clobbered on mount.
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark') return true;
-    if (saved === 'light') return false;
-    return true; // new users default to dark
-  });
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  }, [isDark]);
-
-  return (
-    <button
-      onClick={() => setIsDark(!isDark)}
-      className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 
-                 transition-all duration-200 text-gray-600 dark:text-gray-300"
-      aria-label="Toggle theme"
-    >
-      {isDark ? <Sun size={20} /> : <Moon size={20} />}
-    </button>
-  );
-};
 
 // Account button — only shown when cloud sync is configured.
 const AccountButton: React.FC<{ onSignIn: () => void }> = ({ onSignIn }) => {
@@ -162,6 +137,7 @@ const AppContent: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const { user } = useAuth();
+  const [isDark, toggleTheme] = useTheme();
   const [pendingJoin, setPendingJoin] = useState<string | null>(null);
 
   // Capture a share-link token (?join=…) from the URL on load, then clean it up.
@@ -292,7 +268,7 @@ const AppContent: React.FC = () => {
       />
 
       {/* Category Manager Modal */}
-      <CategoryManager isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <CategoryManager isOpen={showSettings} onClose={() => setShowSettings(false)} isDark={isDark} onToggleTheme={toggleTheme} />
 
       {/* Task History Modal */}
       <TaskHistory isOpen={showHistory} onClose={() => setShowHistory(false)} />
@@ -333,7 +309,6 @@ const AppContent: React.FC = () => {
             </button>
             <AccountButton onSignIn={() => setShowAuth(true)} />
             <NotificationButton />
-            <ThemeToggle />
           </div>
         </div>
       </header>

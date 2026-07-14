@@ -6,9 +6,11 @@ import { useAuth } from './AuthContext';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { pullAll, pushReconcile, migrateToUuids, newId } from '../lib/sync';
 
-// Serialised view of the working set; used to skip redundant/echoed cloud pushes.
+// Serialised view of the working set; used to skip redundant/echoed cloud pushes
+// and to detect offline edits made since the last successful sync.
 const syncSnapshot = (categories: Category[], tasks: Task[]): string =>
   JSON.stringify({ categories, tasks });
+const SNAP_KEY = 'cuetasks_synced_snapshot';
 
 interface TaskContextType {
   tasks: Task[];
@@ -133,6 +135,14 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     }
   }, [categories]);
 
+  // Record the state that is currently in sync with the cloud (in the ref and
+  // persisted, so offline edits can be detected across reloads).
+  const markSynced = useCallback((cats: Category[], tks: Task[]) => {
+    const snap = syncSnapshot(cats, tks);
+    lastSyncedSnapshot.current = snap;
+    try { localStorage.setItem(SNAP_KEY, snap); } catch { /* ignore */ }
+  }, []);
+
   // ── On sign-out, clear the working set ──
   // Prevents another account on the same device from inheriting the previous
   // user's tasks (their data stays safe in the cloud and returns on sign-in).
@@ -140,6 +150,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     if (prevUserId.current && !userId) {
       initialSyncedFor.current = null;
       lastSyncedSnapshot.current = '';
+      try { localStorage.removeItem(SNAP_KEY); } catch { /* ignore */ }
       setTasks([]);
       setCategories(DEFAULT_CATEGORIES);
     }
@@ -173,13 +184,27 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
           setTasks(finalTasks);
           await pushReconcile(userId, finalCats, finalTasks);
         } else {
-          finalCats = cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES;
-          finalTasks = cloud.tasks;
+          // Cloud has data. If this device made offline edits since it last
+          // synced, push them up first so they aren't lost, then re-pull merged.
+          let persisted = '';
+          try { persisted = localStorage.getItem(SNAP_KEY) || ''; } catch { /* ignore */ }
+          const hasLocal = tasksRef.current.length > 0 || categoriesRef.current.length > 0;
+          const localDirty = !!persisted && hasLocal && syncSnapshot(categoriesRef.current, tasksRef.current) !== persisted;
+
+          if (localDirty) {
+            await pushReconcile(userId, categoriesRef.current, tasksRef.current);
+            const merged = await pullAll();
+            finalCats = merged && merged.categories.length ? merged.categories : DEFAULT_CATEGORIES;
+            finalTasks = merged ? merged.tasks : [];
+          } else {
+            finalCats = cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES;
+            finalTasks = cloud.tasks;
+          }
           setCategories(finalCats);
           setTasks(finalTasks);
         }
         if (!cancelled) {
-          lastSyncedSnapshot.current = syncSnapshot(finalCats, finalTasks);
+          markSynced(finalCats, finalTasks);
           initialSyncedFor.current = userId;
         }
       } catch (error) {
@@ -201,11 +226,25 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
 
     const handle = setTimeout(() => {
       pushReconcile(userId, categories, tasks)
-        .then(() => { lastSyncedSnapshot.current = syncSnapshot(categories, tasks); })
+        .then(() => markSynced(categories, tasks))
         .catch(error => console.warn('[sync] push failed:', error));
     }, 800);
     return () => clearTimeout(handle);
-  }, [tasks, categories, userId]);
+  }, [tasks, categories, userId, markSynced]);
+
+  // ── Flush local changes when the connection returns ──
+  useEffect(() => {
+    if (!isSupabaseConfigured || !userId) return;
+    const onOnline = () => {
+      if (initialSyncedFor.current !== userId) return;
+      if (syncSnapshot(categoriesRef.current, tasksRef.current) === lastSyncedSnapshot.current) return;
+      pushReconcile(userId, categoriesRef.current, tasksRef.current)
+        .then(() => markSynced(categoriesRef.current, tasksRef.current))
+        .catch(error => console.warn('[sync] reconnect push failed:', error));
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [userId, markSynced]);
 
   // Pull the cloud set and apply it (used by realtime and after redeeming a link).
   const refreshFromCloud = useCallback(async () => {
@@ -215,13 +254,13 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       if (!cloud) return;
       const cats = cloud.categories.length ? cloud.categories : DEFAULT_CATEGORIES;
       // Set the snapshot first so the push effect treats this as in-sync.
-      lastSyncedSnapshot.current = syncSnapshot(cats, cloud.tasks);
+      markSynced(cats, cloud.tasks);
       setCategories(cats);
       setTasks(cloud.tasks);
     } catch (error) {
       console.warn('[sync] refresh failed:', error);
     }
-  }, [userId]);
+  }, [userId, markSynced]);
 
   // ── Realtime: apply remote changes live (no reload) ──
   useEffect(() => {

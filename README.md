@@ -71,7 +71,6 @@ CueTasks/
 │   │   ├── TaskHistory.tsx       # Modal showing historical tasks and stats
 │   │   ├── TaskItem.tsx          # Individual task component with actions
 │   │   ├── TaskList.tsx          # Renders lists of tasks with sorting/filtering
-│   │   ├── ThemeToggle.tsx       # Dark/Light mode toggle button
 │   │   └── ToastNotification.tsx # In-app alerts for reminders
 │   ├── contexts/
 │   │   └── TaskContext.tsx       # Global state management for tasks and categories
