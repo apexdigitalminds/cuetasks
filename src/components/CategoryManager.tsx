@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Settings as SettingsIcon, Bell, Share2, Moon } from 'lucide-react';
+import { X, Plus, Trash2, Settings as SettingsIcon, Bell, Share2, Moon, Users } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_CATEGORIES, Category } from '../types';
@@ -32,10 +32,12 @@ const PRESET_COLORS = [
 const PRESET_ICONS = ['📁', '🎯', '📝', '🏃', '🎨', '📚', '🎮', '🎵', '🏠', '💼', '🛒', '💡', '❤️', '⭐', '🔥', '✈️'];
 
 const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose, isDark, onToggleTheme }) => {
-    const { categories, addCategory, deleteCategory } = useTaskContext();
+    const { categories, addCategory, deleteCategory, sharedCategoryIds } = useTaskContext();
     const { user, configured } = useAuth();
     const [shareCategory, setShareCategory] = useState<Category | null>(null);
     const canShare = (c: Category) => !!(configured && user && (!c.ownerId || c.ownerId === user.id));
+    const isSharedWithMe = (c: Category) => !!(c.ownerId && user && c.ownerId !== user.id);
+    const isShared = (c: Category) => isSharedWithMe(c) || sharedCategoryIds.has(c.id);
     const [newName, setNewName] = useState('');
     const [newColor, setNewColor] = useState(PRESET_COLORS[0]);
     const [newIcon, setNewIcon] = useState('📁');
@@ -246,6 +248,15 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose, isDa
                                         {isDefaultCategory(category.id) && (
                                             <span className="text-xs text-gray-400 bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded-full">
                                                 Default
+                                            </span>
+                                        )}
+                                        {isShared(category) && (
+                                            <span
+                                                className="inline-flex items-center gap-1 text-xs text-indigo-500 dark:text-indigo-400"
+                                                title={isSharedWithMe(category) ? 'Shared with you' : 'Shared with others'}
+                                            >
+                                                <Users size={13} />
+                                                {isSharedWithMe(category) ? 'Shared with you' : 'Shared'}
                                             </span>
                                         )}
                                     </div>

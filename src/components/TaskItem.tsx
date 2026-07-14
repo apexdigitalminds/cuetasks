@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Check, Clock, Bell, Edit3, Save, X, ArrowUp, ArrowDown, Star, Calendar, Repeat, AlertTriangle, Share2 } from 'lucide-react';
+import { Trash2, Check, Clock, Bell, Edit3, Save, X, ArrowUp, ArrowDown, Star, Calendar, Repeat, AlertTriangle, Share2, Users } from 'lucide-react';
 import { Task } from '../types';
 import { formatTimeOnlyWithTimezone, getLocalDateTimeString, isOverdue } from '../utils/dateUtils';
 import { useTaskContext } from '../contexts/TaskContext';
@@ -11,9 +11,11 @@ interface TaskItemProps {
 }
 
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
-  const { toggleTaskStatus, deleteTask, editTask, toggleTaskStar, moveTaskUp, moveTaskDown, categories, getCategoryById } = useTaskContext();
+  const { toggleTaskStatus, deleteTask, editTask, toggleTaskStar, moveTaskUp, moveTaskDown, categories, getCategoryById, sharedTaskIds } = useTaskContext();
   const { user, configured } = useAuth();
   const canShare = !!(configured && user && (!task.ownerId || task.ownerId === user.id));
+  const isSharedWithMe = !!(task.ownerId && user && task.ownerId !== user.id);
+  const isShared = isSharedWithMe || sharedTaskIds.has(task.id);
   const [showShare, setShowShare] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -267,6 +269,17 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
                   }}
                 >
                   {category.icon} {category.name}
+                </span>
+              )}
+
+              {/* Shared indicator */}
+              {isShared && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
+                  title={isSharedWithMe ? 'Shared with you' : 'Shared with others'}
+                >
+                  <Users size={11} />
+                  {isSharedWithMe ? 'Shared with you' : 'Shared'}
                 </span>
               )}
 

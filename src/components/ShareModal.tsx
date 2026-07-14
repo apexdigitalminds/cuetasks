@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Link2, Copy, Check, Trash2, Mail, Share2, Users } from 'lucide-react';
 import {
   ResourceType, Role, Member, ShareLinkRow,
@@ -111,7 +112,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, resourceType, 
     : feedback?.kind === 'warn' ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20'
     : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20';
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
@@ -208,7 +209,8 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, resourceType, 
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

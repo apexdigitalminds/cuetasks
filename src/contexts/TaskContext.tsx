@@ -4,7 +4,7 @@ import { isSameDay } from '../utils/dateUtils';
 import { getNextOccurrenceDate, isRecurrenceEnded } from '../utils/recurrence';
 import { useAuth } from './AuthContext';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { pullAll, pushReconcile, migrateToUuids, newId } from '../lib/sync';
+import { pullAll, pushReconcile, migrateToUuids, newId, fetchSharedResourceIds } from '../lib/sync';
 
 // Serialised view of the working set; used to skip redundant/echoed cloud pushes
 // and to detect offline edits made since the last successful sync.
@@ -28,6 +28,8 @@ interface TaskContextType {
   deleteCategory: (id: string) => void;
   getCategoryById: (id: string) => Category | undefined;
   refreshFromCloud: () => Promise<void>;
+  sharedCategoryIds: Set<string>;
+  sharedTaskIds: Set<string>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -83,6 +85,8 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   const syncingRef = useRef(false);
   const lastSyncedSnapshot = useRef<string>(''); // serialised state last known in sync with cloud
   const prevUserId = useRef<string | null>(null);
+  const [sharedCategoryIds, setSharedCategoryIds] = useState<Set<string>>(new Set());
+  const [sharedTaskIds, setSharedTaskIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => { categoriesRef.current = categories; }, [categories]);
@@ -143,6 +147,22 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     try { localStorage.setItem(SNAP_KEY, snap); } catch { /* ignore */ }
   }, []);
 
+  // Which lists/tasks are shared (for the UI indicators).
+  const refreshSharedIds = useCallback(async () => {
+    if (!isSupabaseConfigured || !userId) {
+      setSharedCategoryIds(new Set());
+      setSharedTaskIds(new Set());
+      return;
+    }
+    try {
+      const { categoryIds, taskIds } = await fetchSharedResourceIds();
+      setSharedCategoryIds(categoryIds);
+      setSharedTaskIds(taskIds);
+    } catch (error) {
+      console.warn('[sync] shared ids fetch failed:', error);
+    }
+  }, [userId]);
+
   // ── On sign-out, clear the working set ──
   // Prevents another account on the same device from inheriting the previous
   // user's tasks (their data stays safe in the cloud and returns on sign-in).
@@ -153,6 +173,8 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       try { localStorage.removeItem(SNAP_KEY); } catch { /* ignore */ }
       setTasks([]);
       setCategories(DEFAULT_CATEGORIES);
+      setSharedCategoryIds(new Set());
+      setSharedTaskIds(new Set());
     }
     prevUserId.current = userId;
   }, [userId]);
@@ -206,6 +228,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
         if (!cancelled) {
           markSynced(finalCats, finalTasks);
           initialSyncedFor.current = userId;
+          refreshSharedIds();
         }
       } catch (error) {
         console.warn('[sync] initial sync failed:', error);
@@ -257,10 +280,11 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       markSynced(cats, cloud.tasks);
       setCategories(cats);
       setTasks(cloud.tasks);
+      refreshSharedIds();
     } catch (error) {
       console.warn('[sync] refresh failed:', error);
     }
-  }, [userId, markSynced]);
+  }, [userId, markSynced, refreshSharedIds]);
 
   // ── Realtime: apply remote changes live (no reload) ──
   useEffect(() => {
@@ -539,6 +563,8 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     deleteCategory,
     getCategoryById,
     refreshFromCloud,
+    sharedCategoryIds,
+    sharedTaskIds,
   };
 
   return (

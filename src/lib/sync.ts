@@ -114,6 +114,24 @@ export function migrateToUuids(categories: Category[], tasks: Task[]): { categor
   return { categories: nextCats, tasks: nextTasks };
 }
 
+// Ids of categories/tasks involved in sharing (visible to this user via RLS):
+// ones you own that have members or an active link, plus ones shared with you.
+export async function fetchSharedResourceIds(): Promise<{ categoryIds: Set<string>; taskIds: Set<string> }> {
+  if (!supabase) return { categoryIds: new Set(), taskIds: new Set() };
+  const [cm, ts, sl] = await Promise.all([
+    supabase.from('category_members').select('category_id'),
+    supabase.from('task_shares').select('task_id'),
+    supabase.from('share_links').select('resource_type, resource_id').eq('revoked', false),
+  ]);
+  const categoryIds = new Set<string>((cm.data ?? []).map(r => r.category_id as string));
+  const taskIds = new Set<string>((ts.data ?? []).map(r => r.task_id as string));
+  for (const link of sl.data ?? []) {
+    if (link.resource_type === 'category') categoryIds.add(link.resource_id as string);
+    else taskIds.add(link.resource_id as string);
+  }
+  return { categoryIds, taskIds };
+}
+
 // Pull all of the signed-in user's rows (RLS scopes to them automatically).
 export async function pullAll(): Promise<{ categories: Category[]; tasks: Task[] } | null> {
   if (!supabase) return null;
