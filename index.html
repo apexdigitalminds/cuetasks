@@ -47,6 +47,13 @@
           if (dark) document.documentElement.classList.add('dark');
         } catch (e) {}
       })();
+
+      // The browser can fire beforeinstallprompt before React mounts, so stash
+      // it here; the install UI reads it on mount (see hooks/useInstallPrompt).
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__cuetasksInstallPrompt = e;
+      });
     </script>
   </head>
   <body>

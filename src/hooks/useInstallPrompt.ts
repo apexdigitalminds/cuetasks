@@ -5,18 +5,32 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+declare global {
+  interface Window {
+    // Stashed by the inline script in index.html, which listens before React mounts.
+    __cuetasksInstallPrompt?: BeforeInstallPromptEvent;
+  }
+}
+
 // Wraps the PWA install flow. On Chrome/Edge/Android we can trigger the native
 // install prompt; iOS Safari has no such event, so callers fall back to the
 // "Share → Add to Home Screen" hint (isIOS).
 export function useInstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  // Seed from the pre-mount capture so an early event is never missed.
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
+    () => (typeof window !== 'undefined' ? window.__cuetasksInstallPrompt ?? null : null),
+  );
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
       e.preventDefault();
+      window.__cuetasksInstallPrompt = e as BeforeInstallPromptEvent;
       setDeferred(e as BeforeInstallPromptEvent);
     };
-    const onInstalled = () => setDeferred(null);
+    const onInstalled = () => {
+      window.__cuetasksInstallPrompt = undefined;
+      setDeferred(null);
+    };
     window.addEventListener('beforeinstallprompt', onPrompt);
     window.addEventListener('appinstalled', onInstalled);
     return () => {
@@ -36,6 +50,7 @@ export function useInstallPrompt() {
     if (!deferred) return;
     await deferred.prompt();
     await deferred.userChoice;
+    window.__cuetasksInstallPrompt = undefined;
     setDeferred(null);
   }, [deferred]);
 

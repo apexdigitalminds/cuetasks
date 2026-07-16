@@ -5,6 +5,7 @@ import { useTheme } from './hooks/useTheme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Logo from './components/Logo';
 import AuthModal from './components/AuthModal';
+import InstallBanner from './components/InstallBanner';
 import { redeemShareLink } from './lib/sharing';
 import TaskForm from './components/TaskForm';
 import TaskList from './components/TaskList';
@@ -315,6 +316,9 @@ const AppContent: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto pt-24 pb-24 px-4 sm:px-6">
+        {/* Proactive install nudge (hides once installed) */}
+        <InstallBanner />
+
         {/* Daily Summary - Full width */}
         <DailySummary selectedDate={selectedDate} onDateChange={setSelectedDate} />
 
