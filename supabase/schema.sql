@@ -28,9 +28,9 @@ create table public.user_settings (
   -- Notification preferences (consumed by the PWA's alertUser/reminderChecker).
   notifications jsonb not null default
     '{"sound":true,"vibrate":true,"notify_before":true,"notify_on_due":true}'::jsonb,
-  -- Outbound email digest config. scope: 'all' | 'categories' | 'tasks'.
+  -- Outbound email digest config. scope: 'all' | 'categories'.
   email_digest  jsonb not null default
-    '{"enabled":false,"frequency":"daily","send_at":"07:00","scope":"all","category_ids":[],"task_ids":[]}'::jsonb,
+    '{"enabled":false,"frequency":"daily","send_at":"07:00","timezone":"UTC","scope":"all","category_ids":[]}'::jsonb,
   updated_at    timestamptz not null default now()
 );
 

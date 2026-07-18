@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Settings as SettingsIcon, Bell, Share2, Moon, Users } from 'lucide-react';
+import { X, Plus, Trash2, Settings as SettingsIcon, Bell, Share2, Moon, Users, Mail } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_CATEGORIES, Category } from '../types';
 import NotificationSettings from './NotificationSettings';
+import EmailDigestSettings from './EmailDigestSettings';
 import InstallSection from './InstallSection';
 import ShareModal from './ShareModal';
 
@@ -136,6 +137,17 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose, isDa
                         </label>
                         <NotificationSettings />
                     </div>
+
+                    {/* Email digest (cloud-only; hidden when signed out) */}
+                    {configured && user && (
+                        <div className="mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <Mail size={15} className="text-gray-400" />
+                                Email digest
+                            </label>
+                            <EmailDigestSettings />
+                        </div>
+                    )}
 
                     {/* Add New Category */}
                     <div className="mb-6">
