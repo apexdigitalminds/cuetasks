@@ -27,6 +27,15 @@ export async function getEmailDigest(): Promise<EmailDigestSettings> {
   return { ...DEFAULT_EMAIL_DIGEST, ...((data.email_digest ?? {}) as Partial<EmailDigestSettings>) };
 }
 
+// Fire the digest for the signed-in user right now (ignores their schedule).
+// invoke() attaches the user's JWT; the Edge Function verifies it server-side.
+export async function sendTestDigest(): Promise<{ ok: boolean; error?: string; reason?: string }> {
+  if (!supabase) return { ok: false, error: 'Cloud sync is not configured' };
+  const { data, error } = await supabase.functions.invoke('send-digests', { body: {} });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, ...(data ?? {}) };
+}
+
 export async function saveEmailDigest(userId: string, settings: EmailDigestSettings): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase

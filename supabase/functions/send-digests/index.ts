@@ -40,6 +40,13 @@ interface TaskRow {
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
+// The app calls this from the browser ("send test digest"), so CORS is required.
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 // ── time helpers ───────────────────────────────────────────────
 function localParts(timeZone: string, now: Date) {
   try {
@@ -169,6 +176,8 @@ async function sendFor(userId: string, email: string, cfg: DigestConfig, now: Da
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+
   const now = new Date();
   try {
     const cronHeader = req.headers.get('x-cron-secret');
@@ -207,7 +216,7 @@ Deno.serve(async (req) => {
 
       try {
         const result = await sendFor(r.user_id, email, cfg, now, false);
-        result.sent ? sent++ : skipped++;
+        if (result.sent) sent++; else skipped++;
       } catch (e) {
         console.error('digest failed for', r.user_id, e);
       }
@@ -220,5 +229,8 @@ Deno.serve(async (req) => {
 });
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
 }

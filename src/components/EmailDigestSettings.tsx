@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, Send } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTaskContext } from '../contexts/TaskContext';
 import {
@@ -7,6 +7,7 @@ import {
   DEFAULT_EMAIL_DIGEST,
   getEmailDigest,
   saveEmailDigest,
+  sendTestDigest,
 } from '../lib/userSettings';
 
 const Segmented = <T extends string>({ value, options, onChange }: {
@@ -38,6 +39,21 @@ const EmailDigestSettings: React.FC = () => {
   const [digest, setDigest] = useState<Digest>(DEFAULT_EMAIL_DIGEST);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [loaded, setLoaded] = useState(false);
+  const [testState, setTestState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [testError, setTestError] = useState('');
+
+  const handleTest = async () => {
+    setTestState('sending');
+    setTestError('');
+    const res = await sendTestDigest();
+    if (res.ok) {
+      setTestState('sent');
+      setTimeout(() => setTestState('idle'), 4000);
+    } else {
+      setTestError(res.error ?? 'Could not send');
+      setTestState('error');
+    }
+  };
 
   useEffect(() => {
     if (!configured || !user) return;
@@ -154,6 +170,27 @@ const EmailDigestSettings: React.FC = () => {
           )}
         </div>
       )}
+
+      <div className="pt-1">
+        <button
+          type="button"
+          onClick={handleTest}
+          disabled={testState === 'sending'}
+          className="w-full flex items-center justify-center gap-2 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-60 text-gray-700 dark:text-gray-200 rounded-lg transition-colors"
+        >
+          {testState === 'sending'
+            ? <><Loader2 size={14} className="animate-spin" /> Sending…</>
+            : <><Send size={14} /> Send test digest now</>}
+        </button>
+        {testState === 'sent' && (
+          <p className="mt-1.5 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+            <Check size={12} /> Sent — check {user.email}
+          </p>
+        )}
+        {testState === 'error' && (
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{testError}</p>
+        )}
+      </div>
 
       <div className="h-4">
         {status === 'saving' && (
