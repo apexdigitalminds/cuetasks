@@ -210,8 +210,10 @@ Deno.serve(async (req) => {
       if (!cfg.enabled) { skipped++; continue; }
       if (!isDue(cfg, r.last_digest_sent_at, now)) { skipped++; continue; }
 
-      const { data: profile } = await admin.from('profiles').select('email').eq('id', r.user_id).maybeSingle();
-      const email = profile?.email;
+      // Read the address from auth (the source of truth) rather than the
+      // profiles mirror, which can be missing/stale and would silently skip them.
+      const { data: authUser } = await admin.auth.admin.getUserById(r.user_id);
+      const email = authUser?.user?.email;
       if (!email) { skipped++; continue; }
 
       try {
