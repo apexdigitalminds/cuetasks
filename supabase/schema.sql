@@ -31,6 +31,7 @@ create table public.user_settings (
   -- Outbound email digest config. scope: 'all' | 'categories'.
   email_digest  jsonb not null default
     '{"enabled":false,"frequency":"daily","send_at":"07:00","timezone":"UTC","scope":"all","category_ids":[]}'::jsonb,
+  last_digest_sent_at timestamptz,   -- set by the send-digests Edge Function
   updated_at    timestamptz not null default now()
 );
 
