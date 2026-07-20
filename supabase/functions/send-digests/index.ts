@@ -106,13 +106,22 @@ async function buildDigest(userId: string, cfg: DigestConfig, now: Date) {
   const byDue = (a: TaskRow, b: TaskRow) => (a.due_at ?? '').localeCompare(b.due_at ?? '');
   overdue.sort(byDue); dueSoon.sort(byDue);
 
-  if (!overdue.length && !dueSoon.length) return null; // nothing worth emailing
+  // Undated tasks are still outstanding, so they count towards "is there
+  // anything worth sending?" — previously they were collected and dropped.
+  if (!overdue.length && !dueSoon.length && !undated.length) return null;
   return { overdue, dueSoon, undated, horizonDays };
 }
 
-function renderEmail(d: NonNullable<Awaited<ReturnType<typeof buildDigest>>>, tz: string) {
+const UNDATED_CAP = 10;
+
+function renderEmail(d: NonNullable<Awaited<ReturnType<typeof buildDigest>>>, tz: string, now: Date) {
   const time = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)) : '';
+
+  const asOf = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz, weekday: 'short', day: 'numeric', month: 'short',
+    year: 'numeric', hour: 'numeric', minute: '2-digit',
+  }).format(now);
 
   const row = (t: TaskRow, colour: string) => `
     <tr><td style="padding:10px 14px;border-left:3px solid ${colour};background:#f8fafc;border-radius:6px;">
@@ -133,8 +142,16 @@ function renderEmail(d: NonNullable<Awaited<ReturnType<typeof buildDigest>>>, tz
         <div style="color:rgba(255,255,255,.85);font-size:13px;margin-top:2px;">Say it. Cue it. Get it done.</div>
       </td></tr>
       <tr><td style="padding:8px 24px 26px;">
+        <p style="font-size:13px;color:#475569;margin:16px 0 0;line-height:1.5;">
+          These are your outstanding tasks as at <strong style="color:#0f172a;">${asOf}</strong>.
+        </p>
         ${section(`Overdue (${d.overdue.length})`, d.overdue, '#EF4444')}
         ${section(d.horizonDays > 1 ? `Coming up (${d.dueSoon.length})` : `Due today (${d.dueSoon.length})`, d.dueSoon, '#6366F1')}
+        ${d.undated.length ? `
+          <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;margin:22px 0 10px;">No due date (${d.undated.length})</h3>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${d.undated.slice(0, UNDATED_CAP).map(t => row(t, '#94A3B8')).join('')}</table>
+          ${d.undated.length > UNDATED_CAP ? `<p style="font-size:12px;color:#94a3b8;margin:2px 0 0;">+${d.undated.length - UNDATED_CAP} more in the app</p>` : ''}
+        ` : ''}
         <div style="margin-top:26px;text-align:center;">
           <a href="${APP_URL}" style="display:inline-block;background:#6366F1;color:#fff;text-decoration:none;font-size:14px;padding:11px 22px;border-radius:10px;">Open CueTasks</a>
         </div>
@@ -169,8 +186,10 @@ async function sendFor(userId: string, email: string, cfg: DigestConfig, now: Da
   }
   const subject = digest.overdue.length
     ? `CueTasks — ${digest.overdue.length} overdue, ${digest.dueSoon.length} coming up`
-    : `CueTasks — ${digest.dueSoon.length} coming up`;
-  await sendEmail(email, subject, renderEmail(digest, cfg.timezone || 'UTC'));
+    : digest.dueSoon.length
+      ? `CueTasks — ${digest.dueSoon.length} coming up`
+      : `CueTasks — ${digest.undated.length} outstanding`;
+  await sendEmail(email, subject, renderEmail(digest, cfg.timezone || 'UTC', now));
   await admin.from('user_settings').update({ last_digest_sent_at: now.toISOString() }).eq('user_id', userId);
   return { sent: true, reason: 'ok' };
 }

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Task, TaskReminder, Category, DEFAULT_CATEGORIES, RecurrencePattern } from '../types';
-import { isSameDay } from '../utils/dateUtils';
+import { isSameDay, getToday, isOverdue } from '../utils/dateUtils';
 import { getNextOccurrenceDate, isRecurrenceEnded } from '../utils/recurrence';
+import { resetFiredReminder } from '../utils/reminderChecker';
 import { useAuth } from './AuthContext';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { pullAll, pushReconcile, migrateToUuids, newId, fetchSharedResourceIds } from '../lib/sync';
@@ -407,15 +408,25 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   };
 
   const getTasksForDate = (date: string): Task[] => {
+    const viewingToday = date === getToday();
+
     const filteredTasks = tasks.filter(task => {
       if (!task.dateTime || task.dateTime === '') {
         return true;
       }
+      let sameDay = false;
       try {
-        return isSameDay(task.dateTime, date);
+        sameDay = isSameDay(task.dateTime, date);
       } catch {
         return true;
       }
+      if (sameDay) return true;
+
+      // Roll unfinished overdue tasks forward onto today so they stay visible
+      // instead of being stranded on the day they were due.
+      if (viewingToday && isOverdue(task.dateTime, task.completed)) return true;
+
+      return false;
     });
     return sortTasks(filteredTasks);
   };
@@ -468,11 +479,19 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
   };
 
   const editTask = (id: string, updates: Partial<Pick<Task, 'title' | 'dateTime' | 'reminder' | 'categoryId'>>) => {
+    // A new due time (or reminder change) must clear the "already fired" flags,
+    // otherwise an alert that fired for the old time blocks the new one forever.
+    if (updates.dateTime !== undefined || updates.reminder !== undefined) {
+      resetFiredReminder(id);
+    }
+
     setTasks(prevTasks => {
       const updatedTasks = prevTasks.map(task => {
         if (task.id === id) {
           const updatedTask = { ...task, ...updates };
-          if (updates.dateTime && updates.reminder?.enabled) {
+          // Re-schedule off the merged task, so changing only the time (or only
+          // the reminder) still re-arms the service-worker notification.
+          if (updatedTask.dateTime && updatedTask.reminder?.enabled) {
             scheduleNotification(updatedTask);
           }
           return updatedTask;
