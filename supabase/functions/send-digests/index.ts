@@ -112,8 +112,6 @@ async function buildDigest(userId: string, cfg: DigestConfig, now: Date) {
   return { overdue, dueSoon, undated, horizonDays };
 }
 
-const UNDATED_CAP = 10;
-
 function renderEmail(d: NonNullable<Awaited<ReturnType<typeof buildDigest>>>, tz: string, now: Date) {
   const time = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)) : '';
@@ -134,6 +132,17 @@ function renderEmail(d: NonNullable<Awaited<ReturnType<typeof buildDigest>>>, tz
       <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;margin:22px 0 10px;">${title}</h3>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${items.map(t => row(t, colour)).join('')}</table>` : '';
 
+  // Undated tasks are a backlog, not time-pressure, so don't list them all.
+  // Starred ones are shown (you flagged them yourself); the rest are counted.
+  // This keeps the email a constant, scannable length however big the backlog.
+  const starredUndated = d.undated.filter(t => t.starred);
+  const otherUndated = d.undated.length - starredUndated.length;
+  const undatedBlock = d.undated.length ? `
+      <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;margin:22px 0 10px;">No due date (${d.undated.length})</h3>
+      ${starredUndated.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${starredUndated.map(t => row(t, '#F59E0B')).join('')}</table>` : ''}
+      ${otherUndated ? `<p style="font-size:13px;color:#64748b;margin:${starredUndated.length ? '2px' : '0'} 0 0;">${starredUndated.length ? 'Plus ' : ''}${otherUndated} unscheduled task${otherUndated === 1 ? '' : 's'} waiting in the app.</p>` : ''}
+    ` : '';
+
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px;">
     <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;">
@@ -147,11 +156,7 @@ function renderEmail(d: NonNullable<Awaited<ReturnType<typeof buildDigest>>>, tz
         </p>
         ${section(`Overdue (${d.overdue.length})`, d.overdue, '#EF4444')}
         ${section(d.horizonDays > 1 ? `Coming up (${d.dueSoon.length})` : `Due today (${d.dueSoon.length})`, d.dueSoon, '#6366F1')}
-        ${d.undated.length ? `
-          <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;margin:22px 0 10px;">No due date (${d.undated.length})</h3>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${d.undated.slice(0, UNDATED_CAP).map(t => row(t, '#94A3B8')).join('')}</table>
-          ${d.undated.length > UNDATED_CAP ? `<p style="font-size:12px;color:#94a3b8;margin:2px 0 0;">+${d.undated.length - UNDATED_CAP} more in the app</p>` : ''}
-        ` : ''}
+        ${undatedBlock}
         <div style="margin-top:26px;text-align:center;">
           <a href="${APP_URL}" style="display:inline-block;background:#6366F1;color:#fff;text-decoration:none;font-size:14px;padding:11px 22px;border-radius:10px;">Open CueTasks</a>
         </div>

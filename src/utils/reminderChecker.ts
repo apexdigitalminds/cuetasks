@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Task } from '../types';
 import { alertUser } from './audio';
 import { getNotificationSettings } from './notificationSettings';
+import { showLocalNotification } from './notifications';
 
 interface ReminderCallback {
     (taskId: string, taskTitle: string, message: string): void;
@@ -11,19 +12,20 @@ interface ReminderCallback {
 const firedReminders = new Set<string>();  // lead-time ("before due") reminders
 const firedDueAlerts = new Set<string>();  // "due now" alerts
 
-// Play sound/vibration (per settings), raise an in-app toast, and a browser notification.
+// Play sound/vibration (per settings), raise an in-app toast, and an OS notification.
 function fireReminder(task: Task, message: string, onReminder: ReminderCallback) {
     console.log('[ReminderChecker] Firing reminder for:', task.title);
     alertUser();
     onReminder(task.id, task.title, message);
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(`⏰ ${task.title}`, {
-            body: message,
-            icon: '/icon-192.png',
-            tag: `reminder-${task.id}`,
-            requireInteraction: true,
-        });
-    }
+    // Via the service worker so it also shows on mobile and when backgrounded.
+    void showLocalNotification(`⏰ ${task.title}`, {
+        body: message,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: `reminder-${task.id}`,
+        requireInteraction: true,
+        data: { taskId: task.id, url: '/' },
+    });
 }
 
 export function useReminderChecker(

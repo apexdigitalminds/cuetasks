@@ -7,6 +7,7 @@ import Logo from './components/Logo';
 import AuthModal from './components/AuthModal';
 import InstallBanner from './components/InstallBanner';
 import { redeemShareLink } from './lib/sharing';
+import { showLocalNotification } from './utils/notifications';
 import TaskForm from './components/TaskForm';
 import TaskList from './components/TaskList';
 import DailySummary from './components/DailySummary';
@@ -37,9 +38,10 @@ const NotificationButton: React.FC = () => {
     if (permission === 'granted') {
       // Test notification
       playNotificationSound();
-      new Notification('CueTasks', {
+      void showLocalNotification('CueTasks', {
         body: 'Notifications are working! 🎉',
-        icon: '/icon.svg'
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
       });
       return;
     }
@@ -57,9 +59,10 @@ const NotificationButton: React.FC = () => {
 
       if (result === 'granted') {
         playNotificationSound();
-        new Notification('CueTasks', {
+        void showLocalNotification('CueTasks', {
           body: 'Notifications enabled successfully! 🎉',
-          icon: '/icon.svg'
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
         });
       }
     } catch (error) {
