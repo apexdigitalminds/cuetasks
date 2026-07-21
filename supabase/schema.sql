@@ -226,6 +226,26 @@ begin
 end $$;
 grant execute on function public.redeem_share_link(uuid) to authenticated;
 
+-- ─────────────────────────── web push (background reminders) ───────────────────────────
+-- One row per browser/device subscription.
+create table if not exists public.push_subscriptions (
+  endpoint   text primary key,
+  user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  p256dh     text not null,
+  auth       text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions(user_id);
+alter table public.push_subscriptions enable row level security;
+create policy push_subs_owner on public.push_subscriptions for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Server-managed dedup for reminder pushes (client sync never writes these,
+-- so upserts from the app leave them untouched). Each stores the due_at we
+-- last pushed for, so changing a task's due time re-arms the push.
+alter table public.tasks add column if not exists reminder_pushed_for timestamptz;
+alter table public.tasks add column if not exists due_pushed_for      timestamptz;
+
 -- ─────────────────────────── realtime ───────────────────────────
 -- Live sync across devices/clients. (On an existing DB, run just this line.)
 alter publication supabase_realtime add table public.tasks, public.categories;

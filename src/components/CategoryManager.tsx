@@ -4,6 +4,7 @@ import { useTaskContext } from '../contexts/TaskContext';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_CATEGORIES, Category } from '../types';
 import NotificationSettings from './NotificationSettings';
+import PushSettings from './PushSettings';
 import EmailDigestSettings from './EmailDigestSettings';
 import InstallSection from './InstallSection';
 import ShareModal from './ShareModal';
@@ -136,6 +137,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ isOpen, onClose, isDa
                             Notifications
                         </label>
                         <NotificationSettings />
+                        {configured && user && <PushSettings />}
                     </div>
 
                     {/* Email digest (cloud-only; hidden when signed out) */}

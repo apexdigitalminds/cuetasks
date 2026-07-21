@@ -1,5 +1,5 @@
 // Enhanced service worker for persistent mobile notifications
-const CACHE_NAME = 'cuetasks-v1';
+const CACHE_NAME = 'cuetasks-v2';
 const DB_NAME = 'CueTasksDB';
 const DB_VERSION = 3;
 
@@ -457,25 +457,35 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Handle push events
+// Handle push events (background reminders from the send-reminders function)
 self.addEventListener('push', (event) => {
   console.log('Push event received');
-  
-  if (event.data) {
-    const data = event.data.json();
-    const options = {
-      body: data.body,
-      icon: '/icon.svg',
-      badge: '/icon.svg',
+  if (!event.data) return;
+
+  let data = {};
+  try { data = event.data.json(); } catch (e) { data = { title: 'CueTasks', body: event.data.text() }; }
+
+  event.waitUntil((async () => {
+    // If a CueTasks window is already open and visible, the in-app reminder
+    // checker handles it — skip the OS notification to avoid a duplicate.
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const appVisible = clients.some((c) => c.visibilityState === 'visible');
+    if (appVisible) {
+      clients.forEach((c) => c.postMessage({ type: 'PUSH_REMINDER', data }));
+      return;
+    }
+
+    await self.registration.showNotification(data.title || 'CueTasks', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       vibrate: [500, 200, 500, 200, 500],
       requireInteraction: true,
-      data: data
-    };
-    
-    event.waitUntil(
-      self.registration.showNotification(data.title, options)
-    );
-  }
+      tag: data.taskId ? `reminder-${data.taskId}` : undefined,
+      renotify: true,
+      data: data,
+    });
+  })());
 });
 
 // Keep service worker alive
