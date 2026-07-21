@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, BellOff, BellRing, Settings, BarChart3, LogIn, User } from 'lucide-react';
+import { Bell, BellOff, BellRing, Settings, BarChart3, LogIn, User, List, CalendarDays } from 'lucide-react';
 import { TaskProvider, useTaskContext } from './contexts/TaskContext';
 import { useTheme } from './hooks/useTheme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Logo from './components/Logo';
 import AuthModal from './components/AuthModal';
 import InstallBanner from './components/InstallBanner';
+import CalendarView from './components/CalendarView';
 import { redeemShareLink } from './lib/sharing';
 import { showLocalNotification } from './utils/notifications';
 import TaskForm from './components/TaskForm';
@@ -143,6 +144,7 @@ const AppContent: React.FC = () => {
   const { user } = useAuth();
   const [isDark, toggleTheme] = useTheme();
   const [pendingJoin, setPendingJoin] = useState<string | null>(null);
+  const [calendarView, setCalendarView] = useState(false);
 
   // Capture a share-link token (?join=…) from the URL on load, then clean it up.
   useEffect(() => {
@@ -324,6 +326,27 @@ const AppContent: React.FC = () => {
 
         {/* Daily Summary - Full width */}
         <DailySummary selectedDate={selectedDate} onDateChange={setSelectedDate} />
+
+        {/* List / Calendar view toggle */}
+        <div className="flex justify-center mb-6">
+          <div className="inline-flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+            <button
+              onClick={() => setCalendarView(false)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-lg transition-colors ${!calendarView ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              <List size={16} /> List
+            </button>
+            <button
+              onClick={() => setCalendarView(true)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-lg transition-colors ${calendarView ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              <CalendarDays size={16} /> Calendar
+            </button>
+          </div>
+        </div>
+
+        {/* Month overview (optional) */}
+        {calendarView && <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} />}
 
         {/* Content Grid - Responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
