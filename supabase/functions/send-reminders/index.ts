@@ -35,8 +35,20 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+// Robust timestamp parse: tolerates Postgres "2026-07-22 13:39:00+00" (space
+// separator, bare-hour offset) as well as standard ISO.
+function parseTs(s: string | null): number | null {
+  if (!s) return null;
+  const v = s.trim().replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
+  const t = Date.parse(v);
+  return isNaN(t) ? null : t;
+}
+
 Deno.serve(async (req) => {
-  if (!CRON_SECRET || req.headers.get('x-cron-secret') !== CRON_SECRET) return json({ error: 'Unauthorized' }, 401);
+  if (!CRON_SECRET || req.headers.get('x-cron-secret') !== CRON_SECRET) {
+    console.warn('[reminders] rejected: x-cron-secret missing or does not match CRON_SECRET');
+    return json({ error: 'Unauthorized' }, 401);
+  }
 
   const now = Date.now();
   const { data: tasks, error } = await admin
@@ -46,24 +58,25 @@ Deno.serve(async (req) => {
     .eq('completed', false)
     .not('due_at', 'is', null);
   if (error) return json({ error: error.message }, 500);
+  console.log(`[reminders] candidates=${tasks?.length ?? 0}`);
 
-  const ms = (s: string | null) => (s ? new Date(s).getTime() : null);
   interface Job { task: TaskRow; kind: 'before' | 'due'; body: string; }
   const jobs: Job[] = [];
 
   for (const t of (tasks ?? []) as TaskRow[]) {
-    const dueMs = new Date(t.due_at).getTime();
-    if (isNaN(dueMs)) continue;
+    const dueMs = parseTs(t.due_at);
+    if (dueMs === null) continue;
     const reminderMs = dueMs - (t.reminder_minutes_before ?? 15) * 60_000;
 
     // Compare by timestamp (not string) so timezone/format differences don't loop.
-    if (now >= reminderMs && now < dueMs && ms(t.reminder_pushed_for) !== dueMs) {
+    if (now >= reminderMs && now < dueMs && parseTs(t.reminder_pushed_for) !== dueMs) {
       const mins = Math.max(1, Math.round((dueMs - now) / 60_000));
       jobs.push({ task: t, kind: 'before', body: `Due in ${mins} minute${mins === 1 ? '' : 's'}` });
-    } else if (now >= dueMs && now < dueMs + 3_600_000 && ms(t.due_pushed_for) !== dueMs) {
+    } else if (now >= dueMs && now < dueMs + 3_600_000 && parseTs(t.due_pushed_for) !== dueMs) {
       jobs.push({ task: t, kind: 'due', body: 'Due now' });
     }
   }
+  console.log(`[reminders] jobs=${jobs.length}`);
   if (!jobs.length) return json({ ok: true, sent: 0 });
 
   const ownerIds = [...new Set(jobs.map(j => j.task.owner_id))];
@@ -97,5 +110,6 @@ Deno.serve(async (req) => {
     await admin.from('tasks').update({ [col]: job.task.due_at }).eq('id', job.task.id);
   }
 
+  console.log(`[reminders] sent=${sent}`);
   return json({ ok: true, sent, jobs: jobs.length });
 });
