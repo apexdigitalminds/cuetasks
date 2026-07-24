@@ -152,3 +152,14 @@
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
+
+/* Centre the value in the day-selector date field. Native date inputs ignore
+   text-align, so we flex the shadow-DOM contents and centre them as a group. */
+input[type="date"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+input[type="date"]::-webkit-datetime-edit {
+  flex: 0 0 auto;
+}
