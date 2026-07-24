@@ -111,7 +111,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
         setTasks(prevTasks =>
           sortTasks(
             prevTasks.map(task =>
-              task.id === taskId ? { ...task, completed: true } : task
+              task.id === taskId ? { ...task, completed: true, completedAt: new Date().toISOString() } : task
             )
           )
         );
@@ -411,12 +411,13 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     const viewingToday = date === getToday();
 
     const filteredTasks = tasks.filter(task => {
-      // Completed tasks live on the day they were completed and never roll
-      // forward. (Fall back to the due day, then today, if completedAt is missing.)
+      // Completed tasks anchor to a fixed day and NEVER roll forward: the day
+      // completed, else the due day, else the day it was recorded. (Undated
+      // tasks with no completedAt used to fall through to "today" and reappear
+      // every day — this pins them instead.)
       if (task.completed) {
-        if (task.completedAt) return isSameDay(task.completedAt, date);
-        if (task.dateTime) return isSameDay(task.dateTime, date);
-        return viewingToday;
+        const anchor = task.completedAt || task.dateTime || task.createdAt;
+        return anchor ? isSameDay(anchor, date) : false;
       }
 
       // Incomplete "no date" tasks are backlog — surface them on today only.
