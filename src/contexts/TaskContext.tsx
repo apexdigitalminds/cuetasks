@@ -411,23 +411,23 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
     const viewingToday = date === getToday();
 
     const filteredTasks = tasks.filter(task => {
-      if (!task.dateTime || task.dateTime === '') {
-        // "No date" tasks are backlog — surface them on today only, never on
-        // past or future days (so completed ones don't linger into tomorrow).
+      // Completed tasks live on the day they were completed and never roll
+      // forward. (Fall back to the due day, then today, if completedAt is missing.)
+      if (task.completed) {
+        if (task.completedAt) return isSameDay(task.completedAt, date);
+        if (task.dateTime) return isSameDay(task.dateTime, date);
         return viewingToday;
       }
-      let sameDay = false;
-      try {
-        sameDay = isSameDay(task.dateTime, date);
-      } catch {
-        return viewingToday;
-      }
-      if (sameDay) return true;
 
-      // Roll unfinished overdue tasks forward onto today so they stay visible
-      // instead of being stranded on the day they were due. Completed tasks
-      // never roll forward (isOverdue is false once completed).
-      if (viewingToday && isOverdue(task.dateTime, task.completed)) return true;
+      // Incomplete "no date" tasks are backlog — surface them on today only.
+      if (!task.dateTime || task.dateTime === '') {
+        return viewingToday;
+      }
+
+      // Incomplete dated tasks show on their due day...
+      if (isSameDay(task.dateTime, date)) return true;
+      // ...and roll forward onto today while still overdue and unfinished.
+      if (viewingToday && isOverdue(task.dateTime, false)) return true;
 
       return false;
     });
