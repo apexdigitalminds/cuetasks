@@ -120,6 +120,48 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     }
   };
 
+  // The task actions, reused in two spots: a visible row below the task on
+  // mobile, and a hover-revealed cluster on the right on desktop.
+  const actionButtons = (
+    <>
+      <button
+        onClick={() => toggleTaskStar(task.id)}
+        className={`p-1.5 rounded-lg transition-all ${task.starred
+          ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/20'
+          : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+          }`}
+        aria-label={task.starred ? 'Remove star' : 'Add star'}
+      >
+        <Star size={14} fill={task.starred ? 'currentColor' : 'none'} />
+      </button>
+
+      {!task.completed && (
+        <>
+          <button onClick={() => moveTaskUp(task.id)} className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" aria-label="Move up">
+            <ArrowUp size={14} />
+          </button>
+          <button onClick={() => moveTaskDown(task.id)} className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" aria-label="Move down">
+            <ArrowDown size={14} />
+          </button>
+        </>
+      )}
+
+      {canShare && (
+        <button onClick={() => setShowShare(true)} className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" aria-label="Share task">
+          <Share2 size={14} />
+        </button>
+      )}
+
+      <button onClick={handleEdit} className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" aria-label="Edit task">
+        <Edit3 size={14} />
+      </button>
+
+      <button onClick={handleDelete} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all" aria-label="Delete task">
+        <Trash2 size={14} />
+      </button>
+    </>
+  );
+
   return (
     <div
       className={`group relative flex items-start p-4 mb-3 rounded-xl border transition-all duration-300 ${task.completed
@@ -318,69 +360,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
                 </span>
               )}
             </div>
+
+            {/* Actions — a visible row below the content on mobile */}
+            <div className="flex sm:hidden items-center gap-1 mt-2 -ml-1.5">
+              {actionButtons}
+            </div>
           </>
         )}
       </div>
 
-      {/* Actions */}
+      {/* Actions — hover-revealed cluster on the right (desktop only) */}
       {!isEditing && (
-        <div className="flex-shrink-0 flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {/* Star */}
-          <button
-            onClick={() => toggleTaskStar(task.id)}
-            className={`p-1.5 rounded-lg transition-all ${task.starred
-              ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/20'
-              : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-              }`}
-            aria-label={task.starred ? "Remove star" : "Add star"}
-          >
-            <Star size={14} fill={task.starred ? "currentColor" : "none"} />
-          </button>
-
-          {!task.completed && (
-            <>
-              <button
-                onClick={() => moveTaskUp(task.id)}
-                className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all"
-                aria-label="Move up"
-              >
-                <ArrowUp size={14} />
-              </button>
-              <button
-                onClick={() => moveTaskDown(task.id)}
-                className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all"
-                aria-label="Move down"
-              >
-                <ArrowDown size={14} />
-              </button>
-            </>
-          )}
-
-          {canShare && (
-            <button
-              onClick={() => setShowShare(true)}
-              className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all"
-              aria-label="Share task"
-            >
-              <Share2 size={14} />
-            </button>
-          )}
-
-          <button
-            onClick={handleEdit}
-            className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all"
-            aria-label="Edit task"
-          >
-            <Edit3 size={14} />
-          </button>
-
-          <button
-            onClick={handleDelete}
-            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-            aria-label="Delete task"
-          >
-            <Trash2 size={14} />
-          </button>
+        <div className="hidden sm:flex flex-shrink-0 items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          {actionButtons}
         </div>
       )}
 
