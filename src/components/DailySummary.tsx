@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTaskContext } from '../contexts/TaskContext';
 import { formatDate, getDayName, getToday } from '../utils/dateUtils';
 
@@ -129,16 +129,13 @@ const DailySummary: React.FC<DailySummaryProps> = ({
           <ChevronLeft size={18} />
         </button>
 
-        <div className="relative">
-          <CalendarDays size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70" />
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => onDateChange(e.target.value)}
-            className="bg-white/10 hover:bg-white/20 border-0 rounded-lg py-2 pl-10 pr-4 text-white text-sm
-                     focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors cursor-pointer"
-          />
-        </div>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => onDateChange(e.target.value)}
+          className="flex-1 max-w-xs mx-3 bg-white/10 hover:bg-white/20 border-0 rounded-lg py-2 px-3 text-white text-sm text-center
+                   focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors cursor-pointer"
+        />
 
         <button
           onClick={handleNextDay}
