@@ -16,7 +16,7 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ selectedDate, onSelectDate }) => {
-  const { tasks, getCategoryById, sharedTaskIds } = useTaskContext();
+  const { tasks, sharedTaskIds } = useTaskContext();
   const { user } = useAuth();
   const [month, setMonth] = useState(() => {
     const d = new Date(`${selectedDate}T00:00`);
@@ -47,10 +47,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ selectedDate, onSelectDate 
   const todayK = dayKey(new Date());
   const monthLabel = new Date(month.y, month.m, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  const dotColor = (t: Task) => {
-    if (t.completed) return '#22c55e';
-    if (isOverdue(t.dateTime, t.completed)) return '#ef4444';
-    return (t.categoryId && getCategoryById(t.categoryId)?.color) || '#6366f1';
+  // Completion-first: to-do = grey outline, done = green, overdue = red.
+  // (Category colour lives in the day list below, not on the calendar.)
+  const dotClass = (t: Task): string => {
+    if (t.completed) return 'bg-green-500';
+    if (isOverdue(t.dateTime, t.completed)) return 'bg-red-500';
+    return 'border border-gray-400 dark:border-gray-500';
   };
   const isSharedTask = (t: Task) => sharedTaskIds.has(t.id) || (!!t.ownerId && !!user && t.ownerId !== user.id);
 
@@ -97,7 +99,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ selectedDate, onSelectDate 
               {shared && <Users size={9} className="absolute top-1 right-1 text-indigo-400" aria-hidden="true" />}
               <div className="flex flex-wrap justify-center items-center gap-0.5 mt-0.5 px-0.5">
                 {dayTasks.slice(0, 4).map((t, j) => (
-                  <span key={j} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dotColor(t) }} />
+                  <span key={j} className={`w-1.5 h-1.5 rounded-full ${dotClass(t)}`} />
                 ))}
                 {dayTasks.length > 4 && <span className="text-[9px] text-gray-400 dark:text-gray-500 leading-none">+{dayTasks.length - 4}</span>}
               </div>
@@ -107,8 +109,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ selectedDate, onSelectDate 
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[11px] text-gray-500 dark:text-gray-400">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />Overdue</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full border border-gray-400 dark:border-gray-500" />To-do</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Done</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />Overdue</span>
         <span className="flex items-center gap-1"><Users size={11} className="text-indigo-400" />Shared</span>
         {undatedCount > 0 && <span className="ml-auto">{undatedCount} with no date</span>}
       </div>
